@@ -114,7 +114,6 @@
   <script>
     'use strict';
     const GOAL = 36;
-    const RESET_AFTER = 6 * 60 * 60 * 1000;
     const STORAGE_KEY = 'water-display-v1';
     const NIGHT_STORAGE_KEY = 'night-display-v1';
     let testMode = false;
@@ -149,10 +148,21 @@
       const required = activeNightStage === 2 ? 10 : 2;
       document.getElementById('night-hint').textContent = activeNightStage ? `夜深了，记得休息 · 按 Q 恢复正常（${nightState.presses} / ${required}）· 07:30 自动恢复` : '';
     }
-    let state = { count: 0, lastPressed: null };
+    // 喝水日从奥克兰当地 07:30 开始；此前仍属于前一天。
+    function waterDay(now) {
+      const p = Object.fromEntries(nightFormat.formatToParts(new Date(now)).map(part => [part.type, part.value]));
+      const beforeReset = Number(p.hour) * 60 + Number(p.minute) < 450;
+      const date = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) - (beforeReset ? 1 : 0)));
+      return date.toISOString().slice(0, 10);
+    }
+    let state = { count: 0, lastPressed: null, day: waterDay(Date.now()) };
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved && Number.isInteger(saved.count) && saved.count >= 0 && saved.count <= GOAL && Number.isFinite(saved.lastPressed) && saved.lastPressed > 0) state = saved;
+      if (saved && Number.isInteger(saved.count) && saved.count >= 0 && saved.count <= GOAL) {
+        const lastPressed = Number.isFinite(saved.lastPressed) && saved.lastPressed > 0 ? saved.lastPressed : null;
+        const day = typeof saved.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.day) ? saved.day : waterDay(lastPressed || Date.now());
+        state = { count: saved.count, lastPressed, day };
+      }
     } catch (_) { /* 浏览器限制本地存储时，仍可在当前页面计数。 */ }
     const clockFormats = [
       { id: 'auckland', zone: 'Pacific/Auckland' },
@@ -173,9 +183,10 @@
       document.getElementById('water').classList.toggle('complete', state.count === GOAL);
       document.getElementById('status').textContent = state.count === GOAL ? '✓ 今日喝水目标已达成' : state.count === 0 ? '今天的第一口，从现在开始' : `还差 ${GOAL - state.count} 次 · 加油`;
     }
-    function resetIfExpired(now) {
-      if (state.lastPressed !== null && now - state.lastPressed > RESET_AFTER) {
-        state = { count: 0, lastPressed: null };
+    function resetWaterForDay(now) {
+      const day = waterDay(now);
+      if (state.day !== day) {
+        state = { count: 0, lastPressed: null, day };
         save();
         renderCounter();
       }
@@ -190,7 +201,7 @@
       }
       const offset = aucklandOffsetFormat.formatToParts(now).find(part => part.type === 'timeZoneName').value;
       document.getElementById('auckland-season').textContent = offset === 'GMT+13:00' ? '夏令时 · UTC+13' : '标准时间（非夏令时）· UTC+12';
-      resetIfExpired(now.getTime());
+      resetWaterForDay(now.getTime());
       updateNight(now);
     }
     document.addEventListener('keydown', event => {
@@ -215,7 +226,7 @@
       if (event.code !== 'ControlLeft') return;
       event.preventDefault();
       const now = displayNow().getTime();
-      resetIfExpired(now);
+      resetWaterForDay(now);
       state.count = Math.min(GOAL, state.count + 1);
       state.lastPressed = now;
       save();
