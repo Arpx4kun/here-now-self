@@ -127,7 +127,7 @@
     <button id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">配置</button>
     <button id="sleep-toggle">进入就寝（Z）</button>
     <button id="enable-sound" title="浏览器需要先点击一次，才能自动播放提醒音效" hidden>开启声音</button>
-    <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
+    <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试选项</button>
     <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
   </div>
   <div class="sound-gate" id="sound-gate" role="dialog" aria-modal="true" aria-label="开启提醒声音">
@@ -151,7 +151,6 @@
     <label for="test-time">模拟奥克兰日期与时间</label>
     <input type="datetime-local" id="test-time" step="1" required>
     <div class="test-actions">
-      <button type="submit">应用时间</button>
       <button type="button" data-test-time="00:00:00">00:00</button>
       <button type="button" data-test-time="01:00:00">01:00</button>
       <button type="button" data-test-time="07:30:00">07:30</button>
@@ -193,7 +192,7 @@
     let realStateSnapshot = null;
     const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
     function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
-    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance'].map(name => {
+    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'instant'].map(name => {
       const audio = new Audio(`${name}.mp3`);
       audio.preload = 'auto';
       return [name, audio];
@@ -460,6 +459,7 @@
       renderCounter();
       clearWaterReminder();
       celebrateWater();
+      playSound('instant');
     });
     function aucklandInputValue(date) {
       const p = Object.fromEntries(nightFormat.formatToParts(date).map(part => [part.type, part.value]));
@@ -523,7 +523,7 @@
       }
       document.getElementById('test-panel').hidden = !testMode;
       closeSettings();
-      document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试时间';
+      document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试选项';
       document.getElementById('test-toggle').setAttribute('aria-pressed', String(testMode));
       renderCounter();
       tick();
@@ -533,6 +533,7 @@
       applyTestTime();
       document.getElementById('test-time').blur();
     });
+    document.getElementById('test-time').addEventListener('change', applyTestTime);
     document.querySelectorAll('[data-test-time]').forEach(button => {
       button.addEventListener('click', () => {
         const input = document.getElementById('test-time');
