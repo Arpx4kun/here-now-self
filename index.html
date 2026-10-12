@@ -5,62 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>此刻 · 时间与喝水</title>
   <style>
+
     @font-face { font-family: "Xiaolai"; src: url("assets/Xiaolai-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
     :root { color-scheme: dark; font-family: "Xiaolai", "Microsoft YaHei", sans-serif; color: #fff7e9; }
     * { box-sizing: border-box; }
     body { margin: 0; height: 100vh; height: 100dvh; overflow: hidden; background: #172030; }
-    .background { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-    .shade { position: fixed; inset: 0; background: linear-gradient(180deg, rgba(6,13,24,.5), rgba(6,13,24,.15) 48%, transparent 70%); }
-    main { position: relative; padding: clamp(28px, 6vh, 70px) clamp(24px, 7vw, 150px) 0; }
-    .clocks { display: grid; grid-template-columns: 2fr 1fr; gap: 3vw; }
-    .clock { min-width: 0; }
-    .clock { text-align: center; text-shadow: 0 2px 25px rgba(0,0,0,.55); }
-    .place { margin: 0 0 12px; font-size: clamp(16px, 1.8vw, 25px); font-weight: 400; letter-spacing: .18em; }
-    .place span { display: block; margin-top: 5px; font-size: 10px; letter-spacing: .28em; opacity: .6; }
-    .time { font-size: clamp(38px, 9vw, 160px); line-height: 1.08; font-weight: 300; letter-spacing: -.035em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    #china-clock .time { font-size: clamp(25px, 4.8vw, 86px); }
-    .season { margin-top: 8px; font-size: clamp(11px, 1vw, 16px); letter-spacing: .05em; opacity: .7; }
-    .date { margin-top: 14px; font-size: clamp(13px, 1.5vw, 22px); letter-spacing: .06em; opacity: .88; }
-    .water { margin: clamp(24px, 4vh, 45px) auto 0; width: min(640px, 100%); padding: 20px 26px; background: rgba(10,20,32,.48); border: 1px solid rgba(255,244,219,.18); border-radius: 20px; backdrop-filter: blur(12px); box-shadow: 0 8px 35px rgba(0,0,0,.1); }
-    .water-top { display: flex; align-items: center; gap: 22px; }
+    .background { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; }
+    .shade { position: fixed; inset: 0; background: linear-gradient(180deg, #060d1866, #060d1822 48%, transparent 60%); pointer-events: none; }
+    main { position: relative; height: 100%; }
+    .clocks { display: grid; grid-template-columns: 2fr 1fr; height: 50%; }
+    .clock { min-width: 0; display: grid; grid-template-rows: 32% 68%; padding: 0 2vw; text-align: center; text-shadow: 0 2px 25px #0008; }
+    .clock-meta { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding-top: 1vh; }
+    .place { margin: 0; font-size: clamp(16px, 1.6vw, 32px); font-weight: 400; letter-spacing: .12em; }
+    .place span { margin-left: 12px; font-size: .5em; letter-spacing: .2em; opacity: .65; }
+    .clock-details { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 18px; font-size: clamp(11px, 1.15vw, 23px); }
+    .date { opacity: .9; }
+    .season { opacity: .65; font-size: .85em; }
+    .time { display: flex; justify-content: center; align-items: baseline; align-self: center; font-size: min(17vw, 31vh); line-height: 1; font-weight: 400; letter-spacing: -.045em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .seconds { font-size: .5em; letter-spacing: -.04em; opacity: .85; }
+    #china-clock .time { font-size: min(8vw, 17vh); }
+    .water { position: absolute; left: 2vw; bottom: 3vh; width: 29.3vw; max-height: 44vh; padding: clamp(12px, 1.6vw, 28px); background: #0a14206b; border: 1px solid #fff4db29; border-radius: 18px; backdrop-filter: blur(6px); box-shadow: 0 8px 35px #0002; }
+    .water-top { display: flex; align-items: center; gap: 1.4vw; }
     .counter { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    #count { font-size: 48px; line-height: 1; font-weight: 300; }
-    .total { font-size: 18px; opacity: .55; }
-    .caption { font-size: 14px; line-height: 1.8; color: rgba(255,247,233,.78); }
-    .caption strong { display: block; font-weight: 500; font-size: 17px; color: #fff7e9; }
-    .progress { height: 4px; background: rgba(255,255,255,.13); border-radius: 4px; margin-top: 18px; overflow: hidden; }
+    #count { font-size: clamp(32px, 4vw, 76px); line-height: 1; }
+    .total { font-size: clamp(11px, 1.2vw, 23px); opacity: .55; }
+    .caption { font-size: clamp(10px, 1vw, 19px); line-height: 1.8; color: #fff7e9cc; }
+    .caption strong { display: block; font-weight: 400; font-size: 1.3em; color: #fff7e9; }
+    .progress { height: 4px; background: #ffffff22; border-radius: 4px; margin-top: 18px; overflow: hidden; }
     .fill { width: 0; height: 100%; background: #e8c28a; transition: width .25s; }
-    .water-bottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: 11px; color: rgba(255,247,233,.6); }
-    kbd { padding: 2px 6px; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; font: inherit; color: #fff7e9; }
+    .water-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: clamp(10px, .8vw, 15px); color: #fff7e999; }
+    kbd { padding: 2px 6px; border: 1px solid #ffffff4d; border-radius: 4px; font: inherit; color: #fff7e9; }
     .complete .fill { background: #b3d9b6; }
     .complete #status { color: #c4e8c6; }
-    .fullscreen { position: fixed; bottom: 20px; right: 24px; border: 1px solid rgba(255,255,255,.24); border-radius: 8px; background: rgba(10,20,32,.35); color: #fff7e9; padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; opacity: .5; }
-    .fullscreen:hover, .fullscreen:focus-visible { opacity: 1; }
-    :fullscreen .fullscreen { display: none; }
-    @media (max-width: 600px) { main { padding: 35px 16px 0; } .clocks { gap: 14px; } .time { font-size: 11vw; } #china-clock .time { font-size: 5.3vw; } .date { font-size: 12px; } #china-clock .date { font-size: 10px; } .water { padding: 18px; } .water-top { gap: 16px; } .caption { font-size: 12px; } .water-bottom { flex-wrap: wrap; } }
-    @media (max-height: 550px) { main { padding-top: 20px; } .place { margin-bottom: 5px; } .time { font-size: min(7vw, 70px); } .date { margin-top: 5px; } .water { margin-top: 18px; padding: 14px 22px; } }
-    .night-soft #auckland-clock { color: #ff5757; }
-    .night-hint { display: none; text-align: center; margin-top: 18px; font-size: 15px; color: #ff8585; }
-    .night-soft .night-hint, .night-strong .night-hint { display: block; }
-    .night-strong main { height: 100%; padding: 24px; display: flex; flex-direction: column; justify-content: center; }
-    .night-strong .clocks { display: block; }
-    .night-strong #china-clock, .night-strong .water { display: none; }
-    .night-strong .shade { background: rgba(6,13,24,.72); }
-    .night-strong #auckland-clock { color: #ff3b3b; font-weight: 700; }
-    .night-strong #auckland-clock .place { font-size: clamp(24px, 4vw, 65px); font-weight: 700; }
-    .night-strong #auckland-clock .time { font-size: clamp(48px, 19vw, 350px); font-weight: 700; animation: night-pulse 1.2s ease-in-out infinite; text-shadow: 0 0 30px rgba(255,59,59,.35); }
-    .night-strong #auckland-clock .date { font-size: clamp(18px, 3vw, 45px); }
-    @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
-    .test-toggle { left: 20px; right: auto; z-index: 5; }
+    .corner-controls { position: fixed; bottom: 20px; right: 24px; display: flex; gap: 10px; z-index: 5; }
+    .corner-controls button { border: 1px solid #ffffff3d; border-radius: 8px; background: #0a142059; color: #fff7e9; padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; opacity: .6; }
+    .corner-controls button:hover, .corner-controls button:focus-visible { opacity: 1; }
+    :fullscreen #fullscreen { display: none; }
     .test-toggle[aria-pressed="true"] { opacity: 1; color: #e8c28a; }
-    .test-panel { position: fixed; z-index: 5; bottom: 65px; left: 20px; width: min(340px, calc(100vw - 40px)); padding: 18px; border: 1px solid rgba(255,255,255,.25); border-radius: 12px; background: rgba(10,20,32,.95); box-shadow: 0 8px 30px #0005; font-size: 13px; }
+    .test-panel { position: fixed; z-index: 5; bottom: 65px; right: 24px; width: min(340px, calc(100vw - 48px)); padding: 18px; border: 1px solid #ffffff40; border-radius: 12px; background: #0a1420f2; box-shadow: 0 8px 30px #0005; font-size: 13px; }
     .test-panel[hidden] { display: none; }
     .test-panel label { display: block; margin-bottom: 10px; }
     .test-panel input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ffffff40; background: #ffffff0a; color: #fff7e9; font: inherit; }
     .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
-    :fullscreen .test-toggle { display: block; }
+    .night-soft #auckland-clock { color: #ff5757; }
+    .night-hint { display: none; position: absolute; top: 1vh; left: 2vw; width: 62.6vw; text-align: center; font-size: clamp(11px, 1vw, 20px); color: #ff8585; }
+    .night-soft .night-hint, .night-strong .night-hint { display: block; }
+    .night-strong .clocks { display: block; height: 50%; }
+    .night-strong #auckland-clock { height: 100%; grid-template-rows: 32% 68%; color: #ff3b3b; font-weight: 700; }
+    .night-strong #china-clock, .night-strong .water { display: none; }
+    .night-strong .shade { background: #060d18b8; }
+    .night-strong #auckland-clock .place { font-size: clamp(24px, 3vw, 65px); font-weight: 700; }
+    .night-strong #auckland-clock .time { font-size: min(27vw, 31vh); font-weight: 700; animation: night-pulse 1.2s ease-in-out infinite; text-shadow: 0 0 30px #ff3b3b59; }
+    .night-strong #auckland-clock .clock-details { font-size: clamp(16px, 1.8vw, 36px); }
+    .night-strong .night-hint { top: 1vh; left: 0; width: 100%; }
+    @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+    @media (max-width: 900px) { .water-top { align-items: flex-start; flex-direction: column; gap: 8px; } .clock-details { gap: 6px; } .clock-meta { gap: 6px; } .place span { margin-left: 6px; } }
+    @media (orientation: portrait) { .clocks { height: 45%; } .water { width: 42vw; } .time { font-size: 17vw; } #china-clock .time { font-size: 8vw; } .clock-meta { padding-top: 0; } }
   </style>
 </head>
 <body>
@@ -69,15 +71,18 @@
   <main>
     <div class="clocks">
       <section class="clock" id="auckland-clock" aria-label="奥克兰时间">
-        <h1 class="place">奥克兰<span>AUCKLAND</span></h1>
-        <div class="time" id="auckland-time">--:--:--</div>
-        <div class="date" id="auckland-date"></div>
-        <div class="season" id="auckland-season"></div>
+        <div class="clock-meta">
+          <h1 class="place">奥克兰<span>AUCKLAND</span></h1>
+          <div class="clock-details"><div class="date" id="auckland-date"></div><div class="season" id="auckland-season"></div></div>
+        </div>
+        <div class="time" id="auckland-time"><span id="auckland-hours">--:--</span><span class="seconds" id="auckland-seconds">:--</span></div>
       </section>
       <section class="clock" id="china-clock" aria-label="厦门时间">
-        <h2 class="place">厦门<span>XIAMEN</span></h2>
-        <div class="time" id="china-time">--:--:--</div>
-        <div class="date" id="china-date"></div>
+        <div class="clock-meta">
+          <h2 class="place">厦门<span>XIAMEN</span></h2>
+          <div class="clock-details"><div class="date" id="china-date"></div></div>
+        </div>
+        <div class="time" id="china-time"><span id="china-hours">--:--</span><span class="seconds" id="china-seconds">:--</span></div>
       </section>
     </div>
     <div class="night-hint" id="night-hint" role="status"></div>
@@ -90,8 +95,10 @@
       <div class="water-bottom"><span>按 <kbd>左 Ctrl</kbd> 记录一次喝水</span><span id="status" role="status">今天的第一口，从现在开始</span></div>
     </section>
   </main>
-  <button class="fullscreen" id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
-  <button class="fullscreen test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
+  <div class="corner-controls">
+    <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
+    <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
+  </div>
   <form class="test-panel" id="test-panel" hidden>
     <label for="test-time">模拟奥克兰日期与时间</label>
     <input type="datetime-local" id="test-time" step="1" required>
@@ -175,7 +182,9 @@
     function tick() {
       const now = displayNow();
       for (const clock of clockFormats) {
-        document.getElementById(`${clock.id}-time`).textContent = clock.time.format(now);
+        const time = clock.time.format(now);
+        document.getElementById(`${clock.id}-hours`).textContent = time.slice(0, 5);
+        document.getElementById(`${clock.id}-seconds`).textContent = time.slice(5);
         document.getElementById(`${clock.id}-date`).textContent = clock.date.format(now);
       }
       const offset = aucklandOffsetFormat.formatToParts(now).find(part => part.type === 'timeZoneName').value;
