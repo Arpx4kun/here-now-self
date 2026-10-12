@@ -30,7 +30,7 @@ function element() {
       contains: name => classes.has(name),
       toggle(name, on) { on ? classes.add(name) : classes.delete(name); }
     },
-    setAttribute() {}, blur() {},
+    attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, blur() {},
     addEventListener(name, handler) { this.handlers[name] = handler; },
     appendChild(child) { this.children.push(child); child.parent = this; },
     get firstElementChild() { return this.children[0]; },
@@ -145,7 +145,65 @@ run('tick()');
 assert.equal(get('water-flash').classList.contains('flashing'), true);
 finishFlash();
 
+// 按键和按钮共用就寝操作；退出后正常显示，提醒从退出时重新计时。
+press('KeyZ');
+assert(run('sleepUntil') > now);
+press('KeyZ', true);
+assert(run('sleepUntil') > now);
+press('KeyZ');
+assert.equal(run('sleepUntil'), 0);
+assert.equal(run('nextWaterReminderAt'), now + 20 * 60 * 1000);
+get('sleep-toggle').handlers.click();
+assert(run('sleepUntil') > now);
+get('sleep-toggle').handlers.click();
+assert.equal(run('sleepUntil'), 0);
+
+const configure = (minutes, volume) => {
+  get('reminder-minutes').value = minutes;
+  get('daily-volume').value = volume;
+  get('settings-panel').handlers.submit({ preventDefault() {} });
+};
+for (let i = 0; i < 36; i++) press('ControlLeft');
+configure(5, 2000);
+assert.equal(run('GOAL'), 40);
+assert.equal(get('water-volume').textContent, '每天喝 2000 毫升的水');
+assert.equal(get('total').textContent, ' / 40 次');
+assert.equal(get('.progress').attributes['aria-valuemax'], 40);
+assert.equal(run('nextWaterReminderAt'), now + 5 * 60 * 1000);
+assert.equal(JSON.parse(storage['water-settings-v1']).volume, 2000);
+run('clearWaterReminder()');
+now += 5 * 60 * 1000 - 1;
+run('tick()');
+assert.equal(run('reminderFlashing'), false);
+now += 1;
+run('tick()');
+assert.equal(run('reminderFlashing'), true);
+finishFlash();
+configure(5, 50); // 降低目标不丢失已经记录的次数。
+assert.equal(get('count').textContent, 36);
+press('ControlLeft');
+assert.equal(get('count').textContent, 36);
+assert.equal(get('fill').style.width, '100%');
+assert(get('water').classList.contains('complete'));
+configure(0, 1825);
+assert.equal(run('GOAL'), 1);
+get('reset-water').handlers.click();
+assert.equal(get('count').textContent, 0);
+assert.equal(JSON.parse(storage['water-display-v1']).count, 0);
+assert.equal(get('water-reminder').hidden, true);
+configure(20, 1800);
+const realSettings = storage['water-settings-v1'];
+get('test-toggle').handlers.click();
+configure(2, 2500);
+press('ControlLeft');
+assert.equal(run('GOAL'), 50);
+assert.equal(storage['water-settings-v1'], realSettings);
+get('test-toggle').handlers.click();
+assert.equal(run('GOAL'), 36);
+assert.equal(get('count').textContent, 0);
+
 now = Date.parse('2026-10-14T11:00:00Z'); // 00:00，三次 Z。
+run('normalUntil = 0; saveSleep()');
 run('tick()');
 assert.equal(sound('aesthetic').paused, false);
 const midnightPlays = sound('aesthetic').plays;
@@ -160,6 +218,12 @@ assert.equal(run('activeNightStage'), 1);
 press('KeyZ');
 assert(run('sleepUntil') > 0);
 assert.equal(run('activeNightStage'), 0);
+press('KeyZ');
+assert.equal(run('sleepUntil'), 0);
+run('tick()');
+assert.equal(run('activeNightStage'), 0); // 夜间退出保持正常显示。
+press('KeyZ');
+assert(run('sleepUntil') > now);
 
 now = Date.parse('2026-10-15T12:00:00Z'); // 次日 01:00，十次 Z。
 run('tick()');
@@ -173,6 +237,7 @@ assert.equal(run('activeNightStage'), 2);
 press('KeyZ');
 assert.equal(run('sleepUntil'), Date.parse('2026-10-15T18:30:00Z'));
 const sleepingStorage = storage['sleep-display-v1'];
+configure(7, 2200);
 const reopened = vm.createContext({
   Date: FakeDate, Intl, console, Audio: FakeAudio, localStorage: context.localStorage,
   document: context.document, window: context.window, setInterval() {}, setTimeout() {}
@@ -181,6 +246,8 @@ vm.runInContext(script, reopened);
 assert.equal(vm.runInContext('sleepUntil', reopened), Number(sleepingStorage));
 assert.equal(vm.runInContext('activeNightStage', reopened), 0);
 assert.equal(get('water-flash').classList.contains('flashing'), false);
+assert.equal(vm.runInContext('GOAL', reopened), 44);
+assert.equal(vm.runInContext('WATER_REMINDER_INTERVAL', reopened), 7 * 60 * 1000);
 
 run("enterSleep(new Date('2026-09-26T10:00:00Z'))");
 assert.equal(run('sleepUntil'), Date.parse('2026-09-26T18:30:00Z')); // 夏令时开始后的 07:30。
@@ -204,5 +271,5 @@ run("playSound('fragrance'); enterSleep(displayNow())");
 await new Promise(resolve => setImmediate(resolve));
 assert.equal(run('pendingSounds.size'), 0);
 assert(audioInstances.every(audio => audio.paused));
-console.log('PASS: reminders, smooth sky-blue 3×0.9s flash, audio mapping and single night triggers, autoplay retry, sleep audio cancellation, confetti, Ctrl filtering, daily reset, Z thresholds, persistence, 07:30 wake, DST.');
+console.log('PASS: settings validation/persistence/test isolation, dynamic goal and interval, record reset, Z/button sleep entry and exit, night normal display; reminders, sky-blue flash, audio and autoplay retry, sleep cancellation, confetti, daily reset, night thresholds, 07:30 wake, DST.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

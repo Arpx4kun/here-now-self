@@ -50,6 +50,8 @@
     .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
+    .settings-panel label { margin-top: 14px; }
+    .settings-panel h2 { margin: 0; font-size: 17px; font-weight: 400; }
     .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #87ceeb; opacity: 0; pointer-events: none; }
     .water-flash.flashing { display: block; animation: water-flash .9s ease-in-out 3; }
     @keyframes water-flash { 0%, 100% { opacity: 0; } 50% { opacity: .9; } }
@@ -107,8 +109,8 @@
     </div>
     <section class="water" id="water" aria-label="每日喝水计数器">
       <div class="water-top">
-        <div class="counter"><span id="count">0</span><span class="total"> / 36 次</span></div>
-        <div class="caption"><strong>记得喝水</strong>每天喝 1800 毫升的水<br>总共 36 次，每次喝两口</div>
+        <div class="counter"><span id="count">0</span><span class="total" id="total"> / 36 次</span></div>
+        <div class="caption"><strong>记得喝水</strong><span id="water-volume">每天喝 1800 毫升的水</span><br><span id="water-times">总共 36 次，每次喝两口</span></div>
       </div>
       <div class="progress" role="progressbar" aria-label="喝水目标进度" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div class="fill" id="fill"></div></div>
       <div class="water-bottom"><span>按 <kbd>左 Ctrl</kbd> 记录一次喝水</span><span id="status" role="status">今天的第一口，从现在开始</span></div>
@@ -118,10 +120,26 @@
   <div class="water-reminder" id="water-reminder" role="status" hidden>喝一口水 · 按左 Ctrl 记录</div>
   <div class="confetti" id="confetti" aria-hidden="true"></div>
   <div class="corner-controls">
+    <button id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">配置</button>
+    <button id="sleep-toggle">进入就寝（Z）</button>
     <button id="enable-sound" title="浏览器需要先点击一次，才能自动播放提醒音效">开启声音</button>
     <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
     <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
   </div>
+  <form class="test-panel settings-panel" id="settings-panel" hidden>
+    <h2>喝水配置</h2>
+    <label for="reminder-minutes">提醒间隔（分钟）</label>
+    <input type="number" id="reminder-minutes" min="1" max="1440" step="1" value="20" required>
+    <label for="daily-volume">每日饮水量（毫升）</label>
+    <input type="number" id="daily-volume" min="50" max="20000" step="50" value="1800" required>
+    <p>每次喝两口，共 50 毫升；目标饮水量须为 50 的倍数。</p>
+    <div class="test-actions">
+      <button type="submit">保存配置</button>
+      <button type="button" id="reset-water">重置喝水记录</button>
+      <button type="button" id="settings-close">关闭</button>
+    </div>
+    <p id="settings-message" role="status"></p>
+  </form>
   <form class="test-panel" id="test-panel" hidden>
     <label for="test-time">模拟奥克兰日期与时间</label>
     <input type="datetime-local" id="test-time" step="1" required>
@@ -136,13 +154,28 @@
   </form>
   <script>
     'use strict';
-    const GOAL = 36;
-    const WATER_REMINDER_INTERVAL = 20 * 60 * 1000;
+    const SETTINGS_STORAGE_KEY = 'water-settings-v1';
+    let settings = { minutes: 20, volume: 1800 };
+    function validSettings(value) {
+      return value && Number.isInteger(value.minutes) && value.minutes >= 1 && value.minutes <= 1440 && Number.isInteger(value.volume) && value.volume >= 50 && value.volume <= 20000 && value.volume % 50 === 0;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY));
+      if (validSettings(saved)) settings = { minutes: saved.minutes, volume: saved.volume };
+    } catch (_) {}
+    let GOAL = settings.volume / 50;
+    let WATER_REMINDER_INTERVAL = settings.minutes * 60 * 1000;
     let nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
     let reminderFlashing = false;
     const STORAGE_KEY = 'water-display-v1';
     const NIGHT_STORAGE_KEY = 'night-display-v2';
     const SLEEP_STORAGE_KEY = 'sleep-display-v1';
+    const NORMAL_STORAGE_KEY = 'normal-display-v1';
+    let normalUntil = 0;
+    try {
+      const saved = Number(localStorage.getItem(NORMAL_STORAGE_KEY));
+      if (Number.isFinite(saved) && saved > 0) normalUntil = saved;
+    } catch (_) {}
     let sleepUntil = 0;
     try {
       const saved = Number(localStorage.getItem(SLEEP_STORAGE_KEY));
@@ -217,19 +250,24 @@
         stopSounds();
         nightState = { day, presses: 0, stage };
         saveNight();
-        if (!sleepUntil && stage) playSound(stage === 1 ? 'aesthetic' : 'fragrance');
+        if (!sleepUntil && !normalUntil && stage) playSound(stage === 1 ? 'aesthetic' : 'fragrance');
       }
-      activeNightStage = sleepUntil ? 0 : stage;
+      activeNightStage = sleepUntil || normalUntil ? 0 : stage;
       document.body.classList.toggle('night-soft', activeNightStage === 1);
       document.body.classList.toggle('night-strong', activeNightStage === 2);
       const required = activeNightStage === 2 ? 10 : 3;
-      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式\n喝水提醒与音效已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
+      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
+      document.getElementById('sleep-toggle').textContent = sleepUntil ? '退出就寝（Z）' : activeNightStage ? `进入就寝（Z · ${nightState.presses}/${required}）` : '进入就寝（Z）';
     }
     function saveSleep() {
       if (testMode) return;
-      try { localStorage.setItem(SLEEP_STORAGE_KEY, String(sleepUntil)); } catch (_) {}
+      try {
+        localStorage.setItem(SLEEP_STORAGE_KEY, String(sleepUntil));
+        localStorage.setItem(NORMAL_STORAGE_KEY, String(normalUntil));
+      } catch (_) {}
     }
     function updateSleep(now) {
+      if (normalUntil && now.getTime() >= normalUntil) { normalUntil = 0; saveSleep(); }
       if (sleepUntil && now.getTime() >= sleepUntil) {
         sleepUntil = 0;
         saveSleep();
@@ -238,6 +276,7 @@
       document.body.classList.toggle('sleeping', Boolean(sleepUntil));
     }
     function enterSleep(now) {
+      normalUntil = 0;
       const p = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
       const nextDay = Number(p.hour) * 60 + Number(p.minute) >= 450;
       const wakeDay = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + (nextDay ? 1 : 0))).toISOString().slice(0, 10);
@@ -249,6 +288,29 @@
       clearWaterReminder();
       updateNight(now);
     }
+    function exitSleep(now) {
+      // 手动退出时保持正常显示，直到下一次 07:30，避免立刻回到夜间闪烁。
+      normalUntil = sleepUntil;
+      sleepUntil = 0;
+      nightState.presses = 0;
+      saveSleep();
+      saveNight();
+      stopSounds();
+      clearWaterReminder();
+      nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+      updateNight(now);
+    }
+    function toggleSleep() {
+      const now = displayNow();
+      updateNight(now);
+      if (sleepUntil) { exitSleep(now); return; }
+      if (activeNightStage) {
+        nightState.presses += 1;
+        if (nightState.presses >= (activeNightStage === 2 ? 10 : 3)) enterSleep(now);
+        saveNight();
+        updateNight(now);
+      } else enterSleep(now);
+    }
     // 喝水日从奥克兰当地 07:30 开始；此前仍属于前一天。
     function waterDay(now) {
       const p = Object.fromEntries(nightFormat.formatToParts(new Date(now)).map(part => [part.type, part.value]));
@@ -259,7 +321,7 @@
     let state = { count: 0, lastPressed: null, day: waterDay(Date.now()) };
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved && Number.isInteger(saved.count) && saved.count >= 0 && saved.count <= GOAL) {
+      if (saved && Number.isInteger(saved.count) && saved.count >= 0 && saved.count <= 400) {
         const lastPressed = Number.isFinite(saved.lastPressed) && saved.lastPressed > 0 ? saved.lastPressed : null;
         const day = typeof saved.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.day) ? saved.day : waterDay(lastPressed || Date.now());
         state = { count: saved.count, lastPressed, day };
@@ -278,11 +340,15 @@
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
     }
     function renderCounter() {
+      document.getElementById('total').textContent = ` / ${GOAL} 次`;
+      document.getElementById('water-volume').textContent = `每天喝 ${settings.volume} 毫升的水`;
+      document.getElementById('water-times').textContent = `总共 ${GOAL} 次，每次喝两口`;
       document.getElementById('count').textContent = state.count;
-      document.getElementById('fill').style.width = `${state.count / GOAL * 100}%`;
-      document.querySelector('.progress').setAttribute('aria-valuenow', state.count);
-      document.getElementById('water').classList.toggle('complete', state.count === GOAL);
-      document.getElementById('status').textContent = state.count === GOAL ? '✓ 今日喝水目标已达成' : state.count === 0 ? '今天的第一口，从现在开始' : `还差 ${GOAL - state.count} 次 · 加油`;
+      document.getElementById('fill').style.width = `${Math.min(1, state.count / GOAL) * 100}%`;
+      document.querySelector('.progress').setAttribute('aria-valuemax', GOAL);
+      document.querySelector('.progress').setAttribute('aria-valuenow', Math.min(state.count, GOAL));
+      document.getElementById('water').classList.toggle('complete', state.count >= GOAL);
+      document.getElementById('status').textContent = state.count >= GOAL ? '✓ 今日喝水目标已达成' : state.count === 0 ? '今天的第一口，从现在开始' : `还差 ${GOAL - state.count} 次 · 加油`;
     }
     function resetWaterForDay(now) {
       const day = waterDay(now);
@@ -367,24 +433,14 @@
       if (event.ctrlKey && event.code !== 'ControlLeft') return;
       if (event.code === 'KeyZ' || event.key.toLowerCase() === 'z') {
         event.preventDefault();
-        const now = displayNow();
-        updateNight(now);
-        if (sleepUntil) return;
-        if (activeNightStage) {
-          nightState.presses += 1;
-          if (nightState.presses >= (activeNightStage === 2 ? 10 : 3)) {
-            enterSleep(now);
-          }
-          saveNight();
-          updateNight(now);
-        } else enterSleep(now);
+        toggleSleep();
         return;
       }
       if (event.code !== 'ControlLeft') return;
       event.preventDefault();
       const now = displayNow().getTime();
       resetWaterForDay(now);
-      state.count = Math.min(GOAL, state.count + 1);
+      if (state.count < GOAL) state.count += 1;
       state.lastPressed = now;
       save();
       renderCounter();
@@ -421,6 +477,7 @@
       // 每次应用时重新开始模拟，方便反复测试同一提醒。
       nightState = { day: '', presses: 0, stage: 0 };
       sleepUntil = 0;
+      normalUntil = 0;
       state = { ...realStateSnapshot.water };
       document.getElementById('test-message').textContent = testMessage;
       renderCounter();
@@ -432,20 +489,26 @@
         state = { ...realStateSnapshot.water };
         nightState = { ...realStateSnapshot.night };
         sleepUntil = realStateSnapshot.sleepUntil;
+        normalUntil = realStateSnapshot.normalUntil;
+        settings = { ...realStateSnapshot.settings };
+        GOAL = settings.volume / 50;
+        WATER_REMINDER_INTERVAL = settings.minutes * 60 * 1000;
         nextWaterReminderAt = realStateSnapshot.reminderAt;
         testMode = false;
         testOffset = 0;
         realStateSnapshot = null;
       } else {
-        realStateSnapshot = { water: { ...state }, night: { ...nightState }, sleepUntil, reminderAt: nextWaterReminderAt };
+        realStateSnapshot = { water: { ...state }, night: { ...nightState }, sleepUntil, normalUntil, settings: { ...settings }, reminderAt: nextWaterReminderAt };
         testMode = true;
         testOffset = 0;
         document.getElementById('test-time').value = aucklandInputValue(new Date());
         document.getElementById('test-message').textContent = testMessage;
         nightState = { day: '', presses: 0, stage: 0 };
         sleepUntil = 0;
+        normalUntil = 0;
       }
       document.getElementById('test-panel').hidden = !testMode;
+      closeSettings();
       document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试时间';
       document.getElementById('test-toggle').setAttribute('aria-pressed', String(testMode));
       renderCounter();
@@ -468,6 +531,46 @@
       catch (_) { document.getElementById('fullscreen').textContent = '请按 F11 全屏'; }
     });
     document.getElementById('test-water-reminder').addEventListener('click', triggerWaterReminder);
+    document.getElementById('sleep-toggle').addEventListener('click', toggleSleep);
+    function closeSettings() {
+      document.getElementById('settings-panel').hidden = true;
+      document.getElementById('settings-toggle').setAttribute('aria-expanded', 'false');
+    }
+    document.getElementById('settings-close').addEventListener('click', closeSettings);
+    document.getElementById('settings-toggle').addEventListener('click', () => {
+      const panel = document.getElementById('settings-panel');
+      if (!panel.hidden) { closeSettings(); return; }
+      document.getElementById('test-panel').hidden = true;
+      document.getElementById('reminder-minutes').value = settings.minutes;
+      document.getElementById('daily-volume').value = settings.volume;
+      document.getElementById('settings-message').textContent = '';
+      panel.hidden = false;
+      document.getElementById('settings-toggle').setAttribute('aria-expanded', 'true');
+    });
+    document.getElementById('settings-panel').addEventListener('submit', event => {
+      event.preventDefault();
+      const requested = { minutes: Number(document.getElementById('reminder-minutes').value), volume: Number(document.getElementById('daily-volume').value) };
+      if (!validSettings(requested)) {
+        document.getElementById('settings-message').textContent = '间隔须为 1–1440 的整数，饮水量须为 50–20000 内的 50 倍数。';
+        return;
+      }
+      const intervalChanged = settings.minutes !== requested.minutes;
+      settings = requested;
+      GOAL = settings.volume / 50;
+      WATER_REMINDER_INTERVAL = settings.minutes * 60 * 1000;
+      if (intervalChanged) nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+      if (!testMode) { try { localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings)); } catch (_) {} }
+      renderCounter();
+      document.getElementById('settings-message').textContent = `已保存 · 每 ${settings.minutes} 分钟提醒，目标 ${GOAL} 次${testMode ? '（仅本次测试）' : ''}`;
+    });
+    document.getElementById('reset-water').addEventListener('click', () => {
+      state = { count: 0, lastPressed: null, day: waterDay(displayNow()) };
+      save();
+      clearWaterReminder();
+      stopSounds();
+      renderCounter();
+      document.getElementById('settings-message').textContent = testMode ? '测试喝水记录已重置' : '今天的喝水记录已重置';
+    });
     document.addEventListener('visibilitychange', tick);
     window.addEventListener('pageshow', tick);
     renderCounter();
