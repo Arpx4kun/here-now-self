@@ -50,9 +50,9 @@
     .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
-    .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #fff; pointer-events: none; }
-    .water-flash.flashing { display: block; animation: water-flash .9s linear 3; }
-    @keyframes water-flash { 0%, 42% { opacity: 1; } 43%, 100% { opacity: 0; } }
+    .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #87ceeb; opacity: 0; pointer-events: none; }
+    .water-flash.flashing { display: block; animation: water-flash .9s ease-in-out 3; }
+    @keyframes water-flash { 0%, 100% { opacity: 0; } 50% { opacity: .9; } }
     .water-reminder { position: fixed; z-index: 4; bottom: 0; left: 0; width: 100%; padding: 9px 16px; text-align: center; background: #0a1420d9; color: #fff7e9; font-size: clamp(16px, 1.5vw, 28px); line-height: 1.2; pointer-events: none; }
     .water-reminder[hidden] { display: none; }
     .water-reminder-visible .corner-controls { bottom: 64px; }
@@ -118,6 +118,7 @@
   <div class="water-reminder" id="water-reminder" role="status" hidden>喝一口水 · 按左 Ctrl 记录</div>
   <div class="confetti" id="confetti" aria-hidden="true"></div>
   <div class="corner-controls">
+    <button id="enable-sound" title="浏览器需要先点击一次，才能自动播放提醒音效">开启声音</button>
     <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
     <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
   </div>
@@ -152,6 +153,48 @@
     let realStateSnapshot = null;
     const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
     function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
+    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance'].map(name => {
+      const audio = new Audio(`${name}.mp3`);
+      audio.preload = 'auto';
+      return [name, audio];
+    }));
+    const pendingSounds = new Set();
+    let soundGeneration = 0;
+    function stopSounds() {
+      soundGeneration += 1;
+      pendingSounds.clear();
+      for (const audio of Object.values(sounds)) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    }
+    function playSound(name) {
+      if (sleepUntil) return;
+      const audio = sounds[name];
+      const generation = soundGeneration;
+      audio.currentTime = 0;
+      audio.play().then(() => {
+        if (generation !== soundGeneration) return;
+        if (sleepUntil) { audio.pause(); return; }
+        pendingSounds.delete(name);
+        document.getElementById('enable-sound').hidden = pendingSounds.size === 0;
+      }).catch(error => {
+        if (generation !== soundGeneration || sleepUntil) return;
+        if (error.name === 'NotAllowedError') {
+          pendingSounds.add(name);
+          document.getElementById('enable-sound').hidden = false;
+        } else {
+          document.getElementById('enable-sound').hidden = false;
+          document.getElementById('enable-sound').textContent = '音效加载失败 · 重试';
+        }
+      });
+    }
+    document.getElementById('enable-sound').addEventListener('click', () => {
+      if (sleepUntil) return;
+      document.getElementById('enable-sound').textContent = '开启声音';
+      const requested = pendingSounds.size ? [...pendingSounds] : ['fresh'];
+      requested.forEach(playSound);
+    });
     let nightState = { day: '', presses: 0, stage: 0 };
     try {
       const saved = JSON.parse(localStorage.getItem(NIGHT_STORAGE_KEY));
@@ -171,14 +214,16 @@
       const minutes = Number(parts.hour) * 60 + Number(parts.minute);
       const stage = minutes >= 450 ? 0 : minutes >= 60 ? 2 : 1;
       if (nightState.day !== day || nightState.stage !== stage) {
+        stopSounds();
         nightState = { day, presses: 0, stage };
         saveNight();
+        if (!sleepUntil && stage) playSound(stage === 1 ? 'aesthetic' : 'fragrance');
       }
       activeNightStage = sleepUntil ? 0 : stage;
       document.body.classList.toggle('night-soft', activeNightStage === 1);
       document.body.classList.toggle('night-strong', activeNightStage === 2);
       const required = activeNightStage === 2 ? 10 : 3;
-      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式\n定时喝水闪烁已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
+      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式\n喝水提醒与音效已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
     }
     function saveSleep() {
       if (testMode) return;
@@ -200,6 +245,7 @@
       nightState.presses = 0;
       saveSleep();
       saveNight();
+      stopSounds();
       clearWaterReminder();
       updateNight(now);
     }
@@ -258,6 +304,7 @@
       document.body.classList.remove('water-reminder-visible');
       reminderFlashing = true;
       document.getElementById('water-flash').classList.add('flashing');
+      playSound('fresh');
     }
     function checkWaterReminder() {
       if (sleepUntil) return;
@@ -370,6 +417,7 @@
         return;
       }
       testOffset = date.getTime() - Date.now();
+      stopSounds();
       // 每次应用时重新开始模拟，方便反复测试同一提醒。
       nightState = { day: '', presses: 0, stage: 0 };
       sleepUntil = 0;
@@ -379,6 +427,7 @@
       tick();
     }
     document.getElementById('test-toggle').addEventListener('click', () => {
+      stopSounds();
       if (testMode) {
         state = { ...realStateSnapshot.water };
         nightState = { ...realStateSnapshot.night };
