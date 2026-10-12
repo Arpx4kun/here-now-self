@@ -77,6 +77,7 @@ const submitSettings = get('settings-panel').handlers.submit;
 const resetRecords = get('reset-water').handlers.click;
 const configure = (minutes, volume, times = ['00:00', '01:00', '07:30']) => {
   get('reminder-minutes').value = minutes;
+  get('reminder-text').value = run('settings.reminderText');
   get('daily-volume').value = volume;
   get('night-soft-time').value = times[0];
   get('night-strong-time').value = times[1];
@@ -102,6 +103,41 @@ assert.equal(get('main').inert, false);
 assert.match(html, /background: rgb\(0 0 0 \/ 50%\)/);
 assert.match(html, /water-flash \.9s ease-in-out 3/);
 assert.equal(html.includes('.night-strong .water { display: none; }'), false);
+assert.equal(get('auckland-weekday').textContent, '星期一');
+assert.equal(get('auckland-date').textContent.includes('星期'), false);
+
+// 横幅默认值兼容旧配置；自定义内容作为纯文本保存、刷新恢复和测试隔离。
+const defaultReminderText = run('DEFAULT_SETTINGS.reminderText');
+configure(20, 1800);
+get('reminder-text').value = '喝两口水 <b>放松肩膀</b>';
+submitSettings({ preventDefault() {} });
+run('triggerWaterReminder()'); finish();
+assert.equal(get('water-reminder').textContent, '喝两口水 <b>放松肩膀</b>');
+assert.equal(JSON.parse(storage['water-settings-v1']).reminderText, get('water-reminder').textContent);
+assert.equal(vm.runInContext('settings.reminderText', reload()), get('water-reminder').textContent);
+get('reminder-text').value = '   ';
+submitSettings({ preventDefault() {} });
+assert.equal(run('settings.reminderText'), '喝两口水 <b>放松肩膀</b>');
+toggleTest();
+get('reminder-text').value = '测试临时文案';
+submitSettings({ preventDefault() {} });
+run('triggerWaterReminder()'); finish();
+assert.equal(get('water-reminder').textContent, '测试临时文案');
+toggleTest();
+run('triggerWaterReminder()'); finish();
+assert.equal(get('water-reminder').textContent, '喝两口水 <b>放松肩膀</b>');
+get('default-reminder-text').handlers.click();
+submitSettings({ preventDefault() {} });
+assert.equal(run('settings.reminderText'), defaultReminderText);
+const legacySettings = JSON.parse(storage['water-settings-v1']);
+delete legacySettings.reminderText;
+legacySettings.minutes = 25;
+storage['water-settings-v1'] = JSON.stringify(legacySettings);
+const legacyReload = reload();
+assert.equal(vm.runInContext('settings.minutes', legacyReload), 25);
+assert.equal(vm.runInContext('settings.reminderText', legacyReload), defaultReminderText);
+configure(20, 1800);
+run('clearWaterReminder()');
 
 // 正常、初级、高级三个状态均允许喝水提醒和音效。
 now += 20 * 60 * 1000;
