@@ -78,7 +78,7 @@
     .sleeping .night-hint { display: block; color: #b3d9b6; }
     .night-strong .clocks { display: block; height: 50%; }
     .night-strong #auckland-clock { height: 100%; grid-template-rows: 32% 68%; color: #ff3b3b; font-weight: 700; }
-    .night-strong #china-clock, .night-strong .water { display: none; }
+    .night-strong #china-clock { display: none; }
     .night-strong .shade { background: #060d18b8; }
     .night-strong #auckland-clock .clock-meta { flex-direction: row; gap: 2vw; }
     .night-strong #auckland-clock .place { flex: 0 0 44vw; white-space: nowrap; font-size: clamp(45px, 5.625vw, 121.875px); font-weight: 700; }
@@ -280,7 +280,7 @@
       const reminding = mode === MODES.SOFT || mode === MODES.STRONG;
       const required = mode === MODES.STRONG ? 10 : 3;
       document.getElementById('night-hint').textContent = isSleeping() ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 ${settings.resetTime} 自动退出` : reminding ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
-      document.getElementById('sleep-toggle').textContent = isSleeping() ? '退出就寝（Z）' : '进入就寝（Z）';
+      document.getElementById('sleep-toggle').textContent = isSleeping() ? '退出就寝（Z）' : reminding ? `进入就寝（Z · ${presses}/${required}）` : '进入就寝（Z）';
     }
     function transitionMode(mode, { wakeAt = 0, reason = 'clock' } = {}) {
       if (mode === displayState.mode) { renderDisplayState(); return; }
@@ -327,11 +327,11 @@
       nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
       transitionMode(scheduledMode(now), { reason: 'wake' });
     }
-    function toggleSleep(fromButton = false) {
+    function toggleSleep() {
       const now = displayNow();
       updateDisplayState(now);
       if (isSleeping()) { exitSleep(now); return; }
-      if (!fromButton && displayState.mode !== MODES.NORMAL) {
+      if (displayState.mode !== MODES.NORMAL) {
         displayState.presses += 1;
         if (displayState.presses >= (displayState.mode === MODES.STRONG ? 10 : 3)) enterSleep(now);
         else renderDisplayState();
@@ -494,8 +494,13 @@
       const date = new Date(instant);
       return aucklandInputValue(date) === `${year}-${month}-${day}T${hour}:${minute}:${second}` ? date : null;
     }
-    function applyTestTime() {
-      const date = aucklandInputToDate(document.getElementById('test-time').value);
+    function applyTestTime({ recovery = false } = {}) {
+      const value = document.getElementById('test-time').value;
+      let date = aucklandInputToDate(value);
+      if (!date && recovery) {
+        const dayStart = aucklandInputToDate(`${value.slice(0, 10)}T00:00:00`);
+        if (dayStart) date = new Date(nextRecovery(dayStart));
+      }
       if (!date) {
         document.getElementById('test-message').textContent = '请输入有效的奥克兰时间（夏令时跳过的时刻无法设置）。';
         return;
@@ -503,9 +508,11 @@
       testOffset = date.getTime() - Date.now();
       stopSounds();
       // 每次应用时重新开始模拟，方便反复测试同一提醒。
-      displayState = { mode: MODES.NORMAL, wakeAt: 0, presses: 0 };
+      displayState = recovery ? { mode: MODES.SLEEP, wakeAt: date.getTime(), presses: 0 } : { mode: MODES.NORMAL, wakeAt: 0, presses: 0 };
       clearWaterReminder();
       state = { ...realStateSnapshot.water };
+      // 恢复预设模拟刚跨过恢复时刻，走与真实自动退出相同的路径。
+      if (recovery) state.day = waterDay(date.getTime() - 1000);
       document.getElementById('test-message').textContent = testMessage;
       renderCounter();
       tick();
@@ -549,7 +556,7 @@
       button.addEventListener('click', () => {
         const input = document.getElementById('test-time');
         input.value = `${input.value.slice(0, 10)}T${button.dataset.testTime}`;
-        applyTestTime();
+        applyTestTime({ recovery: button.id === 'test-reset-time' });
       });
     });
     document.getElementById('fullscreen').addEventListener('click', async () => {
@@ -557,7 +564,7 @@
       catch (_) { document.getElementById('fullscreen').textContent = '请按 F11 全屏'; }
     });
     document.getElementById('test-water-reminder').addEventListener('click', triggerWaterReminder);
-    document.getElementById('sleep-toggle').addEventListener('click', () => toggleSleep(true));
+    document.getElementById('sleep-toggle').addEventListener('click', toggleSleep);
     function closeSettings() {
       document.getElementById('settings-panel').hidden = true;
       document.getElementById('settings-toggle').setAttribute('aria-expanded', 'false');

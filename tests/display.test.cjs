@@ -38,7 +38,7 @@ function element() {
   };
 }
 const elements = {};
-const get = id => elements[id] ||= element();
+const get = id => elements[id] ||= Object.assign(element(), { id });
 class FakeDate extends Date {
   constructor(...args) { super(...(args.length ? args : [now])); }
   static now() { return now; }
@@ -47,7 +47,8 @@ const context = vm.createContext({
   Date: FakeDate, Intl, console, Audio: FakeAudio,
   localStorage: { getItem: key => storage[key] || null, setItem: (key, value) => storage[key] = value },
   document: {
-    body: element(), getElementById: get, querySelector: get, querySelectorAll: () => [],
+    body: element(), getElementById: get, querySelector: get,
+    querySelectorAll: selector => selector === '[data-test-time]' ? ['test-soft-time', 'test-strong-time', 'test-reset-time'].map(get) : [],
     createElement: element, addEventListener: (name, handler) => listeners[name] = handler
   },
   window: { innerWidth: 1920, innerHeight: 1080, addEventListener() {} },
@@ -69,7 +70,9 @@ const mode = () => run('displayState.mode');
 const at = value => { now = Date.parse(value); run('tick()'); };
 const finish = () => finishFlash();
 const clickSleep = get('sleep-toggle').handlers.click;
+const clickSleepTimes = count => { for (let i = 0; i < count; i++) clickSleep(); };
 const toggleTest = get('test-toggle').handlers.click;
+const testRecovery = get('test-reset-time').handlers.click;
 const submitSettings = get('settings-panel').handlers.submit;
 const resetRecords = get('reset-water').handlers.click;
 const configure = (minutes, volume, times = ['00:00', '01:00', '07:30']) => {
@@ -98,6 +101,7 @@ assert.equal(get('sound-gate').hidden, true);
 assert.equal(get('main').inert, false);
 assert.match(html, /background: rgb\(0 0 0 \/ 50%\)/);
 assert.match(html, /water-flash \.9s ease-in-out 3/);
+assert.equal(html.includes('.night-strong .water { display: none; }'), false);
 
 // 正常、初级、高级三个状态均允许喝水提醒和音效。
 now += 20 * 60 * 1000;
@@ -190,8 +194,11 @@ press('KeyZ');
 assert.equal(mode(), 'sleep');
 press('KeyZ');
 assert.equal(mode(), 'strong-reminder');
+clickSleepTimes(9);
+assert.equal(mode(), 'strong-reminder');
+assert.equal(run('displayState.presses'), 9);
 clickSleep();
-assert.equal(mode(), 'sleep'); // 屏幕按钮在高级提醒也能直接进入。
+assert.equal(mode(), 'sleep'); // 屏幕按钮与 Z 共同遵守十次确认。
 const quietPlays = audioInstances.map(audio => audio.plays);
 at('2026-10-13T16:00:00Z');
 run('triggerWaterReminder()');
@@ -202,6 +209,11 @@ assert.equal(mode(), 'normal');
 // 初级状态点击进入同样保持睡眠到恢复时刻。
 at('2026-10-14T11:00:00Z');
 assert.equal(mode(), 'soft-reminder');
+clickSleep();
+assert.equal(mode(), 'soft-reminder');
+assert.equal(run('displayState.presses'), 1);
+press('KeyZ');
+assert.equal(run('displayState.presses'), 2);
 clickSleep();
 assert.equal(mode(), 'sleep');
 at('2026-10-14T12:00:00Z');
@@ -217,6 +229,15 @@ assert.equal(run('nextWaterReminderAt'), now + 5 * 60 * 1000);
 const realStorage = JSON.stringify(storage);
 toggleTest();
 configure(2, 2500);
+const beginningBeforeTest = sound('begining').plays;
+testRecovery();
+assert.equal(mode(), 'normal');
+assert.equal(get('count').textContent, 0);
+assert.equal(sound('begining').plays, beginningBeforeTest + 1);
+run('tick(); tick()');
+assert.equal(sound('begining').plays, beginningBeforeTest + 1);
+testRecovery();
+assert.equal(sound('begining').plays, beginningBeforeTest + 2);
 run('triggerWaterReminder()'); finish();
 assert.equal(get('water-reminder').hidden, false);
 toggleTest();
@@ -250,12 +271,25 @@ assert.equal(mode(), 'strong-reminder');
 press('KeyZ');
 at('2026-10-15T11:00:00Z');
 assert.equal(run('displayState.presses'), 1);
-clickSleep();
+clickSleepTimes(9); // 已经按过一次 Z，按钮接着累计到十次。
 assert.equal(run('displayState.wakeAt'), Date.parse('2026-10-15T19:00:00Z'));
 at('2026-10-15T19:00:00Z');
 assert.equal(mode(), 'normal');
 assert.equal(get('test-reset-time').dataset.testTime, '08:00:00');
+toggleTest();
+const customRecoveryBefore = sound('begining').plays;
+testRecovery();
+assert.equal(get('auckland-hours').textContent, '08:00');
+assert.equal(sound('begining').plays, customRecoveryBefore + 1);
+toggleTest();
 configure(20, 1800, ['00:00', '01:00', '02:30']);
+toggleTest();
+get('test-time').value = '2026-09-27T00:00:00';
+const dstRecoveryBefore = sound('begining').plays;
+testRecovery();
+assert.equal(get('auckland-hours').textContent, '03:00');
+assert.equal(sound('begining').plays, dstRecoveryBefore + 1);
+toggleTest();
 at('2026-09-26T10:00:00Z');
 clickSleep();
 assert.equal(run('displayState.wakeAt'), Date.parse('2026-09-26T14:00:00Z'));
@@ -281,5 +315,5 @@ await new Promise(resolve => setImmediate(resolve));
 assert.equal(run('pendingSounds.size'), 0);
 assert(audioInstances.every(audio => audio.src === 'music.mp3' || audio.paused));
 assert.equal(mode(), 'sleep');
-console.log('PASS: four explicit states; reminders/audio in every awake state; sleep entered by Z/button from all states blocks all reminders across midnight and 01:00 until recovery; manual exit resumes scheduled state, persistence, test isolation, configuration, DST and audio cancellation.');
+console.log('PASS: shared Z/button counters, recovery test preset plays Beginning once and clears records, repeated/custom/DST recovery tests, test restoration; four states, sleep suppression, configuration, audio and daily reset.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
