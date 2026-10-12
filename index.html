@@ -14,15 +14,16 @@
     .shade { position: fixed; inset: 0; background: linear-gradient(180deg, #060d1866, #060d1822 48%, transparent 60%); pointer-events: none; }
     main { position: relative; height: 100%; }
     .clocks { display: grid; grid-template-columns: 2fr 1fr; height: 50%; }
-    .clock { min-width: 0; display: grid; grid-template-rows: 32% 68%; padding: 0 2vw; text-align: center; text-shadow: 0 2px 25px #0008; }
+    .clock { min-width: 0; display: grid; grid-template-rows: 32% 68%; padding: 0 2vw; text-align: left; text-shadow: 0 2px 25px #0008; }
     .clock-meta { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 12px; padding-top: 2vh; text-align: left; line-height: 1.1; }
     .place { margin: 0; font-size: clamp(30px, 3vw, 60px); font-weight: 400; letter-spacing: .12em; }
     .place span { margin-left: 12px; font-size: .5em; letter-spacing: .2em; opacity: .65; }
     .clock-details { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 100%; font-size: clamp(16.5px, 1.725vw, 34.5px); }
     .date { opacity: .9; font-size: 1.5em; }
     .season { opacity: .65; font-size: 1.0625em; }
-    .time { display: flex; justify-content: center; align-items: baseline; align-self: center; font-size: min(17vw, 31vh); line-height: 1; font-weight: 400; letter-spacing: -.045em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .seconds { font-size: .5em; letter-spacing: -.04em; opacity: .85; }
+    .clock-time-block { position: relative; align-self: center; min-width: 0; }
+    .time { display: flex; justify-content: flex-start; align-items: baseline; font-size: min(17vw, 31vh); line-height: 1; font-weight: 400; letter-spacing: .005em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .seconds { font-size: .5em; letter-spacing: .005em; opacity: .85; }
     #china-clock .time { font-size: min(8vw, 17vh); }
     .water { position: absolute; left: 2vw; bottom: 3vh; width: 29.3vw; max-height: 44vh; padding: clamp(12px, 1.6vw, 28px); background: #0a14206b; border: 1px solid #fff4db29; border-radius: 18px; backdrop-filter: blur(6px); box-shadow: 0 8px 35px #0002; }
     .water-top { display: flex; align-items: center; gap: 1.4vw; }
@@ -65,7 +66,7 @@
       100% { opacity: 0; transform: translate(var(--end-x), 200px) rotate(var(--end-spin)); }
     }
     .night-soft #auckland-clock { color: #ff5757; }
-    .night-hint { display: none; position: absolute; top: 21vh; left: 2vw; width: 62.6vw; text-align: left; font-size: clamp(11px, 1vw, 20px); color: #ff8585; }
+    .night-hint { display: none; position: absolute; top: 100%; left: 0; width: 100%; margin-top: 12px; text-align: left; white-space: pre-line; line-height: 1.35; font-size: clamp(22px, 2vw, 40px); color: #ff8585; }
     .night-soft .night-hint, .night-strong .night-hint { display: block; }
     .sleeping .night-hint { display: block; color: #b3d9b6; }
     .night-strong .clocks { display: block; height: 50%; }
@@ -76,7 +77,6 @@
     .night-strong #auckland-clock .place { flex: 0 0 44vw; white-space: nowrap; font-size: clamp(45px, 5.625vw, 121.875px); font-weight: 700; }
     .night-strong #auckland-clock .time { font-size: min(27vw, 31vh); font-weight: 700; animation: night-pulse 1.2s ease-in-out infinite; text-shadow: 0 0 30px #ff3b3b59; }
     .night-strong #auckland-clock .clock-details { font-size: clamp(24px, 2.7vw, 54px); }
-    .night-strong .night-hint { top: 18vh; left: 2vw; width: 27vw; text-align: left; }
     @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
     @media (max-width: 900px) { .water-top { align-items: flex-start; flex-direction: column; gap: 8px; } .clock-details { gap: 6px; } .clock-meta { gap: 6px; } .place span { margin-left: 6px; } }
     @media (orientation: portrait) { .clocks { height: 45%; } .water { width: 42vw; } .time { font-size: 17vw; } #china-clock .time { font-size: 8vw; } .clock-meta { padding-top: 0; } }
@@ -92,17 +92,19 @@
           <h1 class="place">奥克兰<span>AUCKLAND</span></h1>
           <div class="clock-details"><div class="date" id="auckland-date"></div><div class="season" id="auckland-season"></div></div>
         </div>
-        <div class="time" id="auckland-time"><span id="auckland-hours">--:--</span><span class="seconds" id="auckland-seconds">:--</span></div>
+        <div class="clock-time-block">
+          <div class="time" id="auckland-time"><span id="auckland-hours">--:--</span><span class="seconds" id="auckland-seconds">:--</span></div>
+          <div class="night-hint" id="night-hint" role="status"></div>
+        </div>
       </section>
       <section class="clock" id="china-clock" aria-label="厦门时间">
         <div class="clock-meta">
           <h2 class="place">厦门<span>XIAMEN</span></h2>
           <div class="clock-details"><div class="date" id="china-date"></div><div class="season" id="china-season">中国标准时间 · UTC+8</div></div>
         </div>
-        <div class="time" id="china-time"><span id="china-hours">--:--</span><span class="seconds" id="china-seconds">:--</span></div>
+        <div class="clock-time-block"><div class="time" id="china-time"><span id="china-hours">--:--</span><span class="seconds" id="china-seconds">:--</span></div></div>
       </section>
     </div>
-    <div class="night-hint" id="night-hint" role="status"></div>
     <section class="water" id="water" aria-label="每日喝水计数器">
       <div class="water-top">
         <div class="counter"><span id="count">0</span><span class="total"> / 36 次</span></div>
@@ -176,7 +178,7 @@
       document.body.classList.toggle('night-soft', activeNightStage === 1);
       document.body.classList.toggle('night-strong', activeNightStage === 2);
       const required = activeNightStage === 2 ? 10 : 3;
-      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式 · 定时喝水闪烁已暂停 · 奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息 · 按 ${required} 下 Z 退出提醒并就寝（${nightState.presses} / ${required}）· 07:30 自动恢复` : '';
+      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式\n定时喝水闪烁已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
     }
     function saveSleep() {
       if (testMode) return;
