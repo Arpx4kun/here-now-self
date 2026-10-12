@@ -16,11 +16,11 @@
     .clocks { display: grid; grid-template-columns: 2fr 1fr; height: 50%; }
     .clock { min-width: 0; display: grid; grid-template-rows: 32% 68%; padding: 0 2vw; text-align: center; text-shadow: 0 2px 25px #0008; }
     .clock-meta { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding-top: 1vh; }
-    .place { margin: 0; font-size: clamp(16px, 1.6vw, 32px); font-weight: 400; letter-spacing: .12em; }
+    .place { margin: 0; font-size: clamp(20px, 2vw, 40px); font-weight: 400; letter-spacing: .12em; }
     .place span { margin-left: 12px; font-size: .5em; letter-spacing: .2em; opacity: .65; }
     .clock-details { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 18px; font-size: clamp(11px, 1.15vw, 23px); }
-    .date { opacity: .9; }
-    .season { opacity: .65; font-size: .85em; }
+    .date { opacity: .9; font-size: 1.5em; }
+    .season { opacity: .65; font-size: 1.0625em; }
     .time { display: flex; justify-content: center; align-items: baseline; align-self: center; font-size: min(17vw, 31vh); line-height: 1; font-weight: 400; letter-spacing: -.045em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .seconds { font-size: .5em; letter-spacing: -.04em; opacity: .85; }
     #china-clock .time { font-size: min(8vw, 17vh); }
@@ -56,10 +56,10 @@
     .night-strong #auckland-clock { height: 100%; grid-template-rows: 32% 68%; color: #ff3b3b; font-weight: 700; }
     .night-strong #china-clock, .night-strong .water { display: none; }
     .night-strong .shade { background: #060d18b8; }
-    .night-strong #auckland-clock .place { font-size: clamp(24px, 3vw, 65px); font-weight: 700; }
+    .night-strong #auckland-clock .place { font-size: clamp(30px, 3.75vw, 81.25px); font-weight: 700; }
     .night-strong #auckland-clock .time { font-size: min(27vw, 31vh); font-weight: 700; animation: night-pulse 1.2s ease-in-out infinite; text-shadow: 0 0 30px #ff3b3b59; }
     .night-strong #auckland-clock .clock-details { font-size: clamp(16px, 1.8vw, 36px); }
-    .night-strong .night-hint { top: 1vh; left: 0; width: 100%; }
+    .night-strong .night-hint { top: 1vh; left: 2vw; width: 27vw; text-align: left; }
     @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
     @media (max-width: 900px) { .water-top { align-items: flex-start; flex-direction: column; gap: 8px; } .clock-details { gap: 6px; } .clock-meta { gap: 6px; } .place span { margin-left: 6px; } }
     @media (orientation: portrait) { .clocks { height: 45%; } .water { width: 42vw; } .time { font-size: 17vw; } #china-clock .time { font-size: 8vw; } .clock-meta { padding-top: 0; } }
