@@ -21,7 +21,7 @@
     .clock-details { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 100%; font-size: clamp(16.5px, 1.725vw, 34.5px); }
     .date { opacity: .9; font-size: 1.5em; }
     .calendar { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4em; }
-    #auckland-clock .weekday { font-size: 1.5em; }
+    #auckland-clock .calendar { font-size: 2.25em; }
     .season { opacity: .65; font-size: 1.0625em; }
     .clock-time-block { position: relative; align-self: center; min-width: 0; }
     .time { display: flex; justify-content: flex-start; align-items: baseline; font-size: min(17vw, 31vh); line-height: 1; font-weight: 400; letter-spacing: .005em; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -101,7 +101,8 @@
     .night-strong #auckland-clock .clock-details { font-size: clamp(24px, 2.7vw, 54px); }
     .night-strong #auckland-clock .clock-details { flex: 1; align-items: flex-end; text-align: right; }
     .night-strong #auckland-clock .calendar { flex-direction: column; align-items: flex-end; gap: 4px; font-size: 1em; }
-    .night-strong #auckland-clock .weekday { font-size: 1em; }
+    .night-strong #auckland-clock .season { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: .85em; }
+    .night-strong #auckland-clock .zone-separator { display: none; }
     @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
     @media (max-width: 900px) { .water-top { align-items: flex-start; flex-direction: column; gap: 8px; } .clock-details { gap: 6px; } .clock-meta { gap: 6px; } .place span { margin-left: 6px; } }
     @media (orientation: portrait) { .clocks { height: 45%; } .water { width: 42vw; } .time { font-size: 17vw; } #china-clock .time { font-size: 8vw; } .clock-meta { padding-top: 0; } }
@@ -115,7 +116,7 @@
       <section class="clock" id="auckland-clock" aria-label="奥克兰时间">
         <div class="clock-meta">
           <h1 class="place"><span class="city-name" id="auckland-city">奥克兰</span><span id="auckland-english">AUCKLAND</span></h1>
-          <div class="clock-details"><div class="season" id="auckland-season"></div><div class="date calendar"><span id="auckland-date"></span><span class="weekday" id="auckland-weekday"></span></div></div>
+          <div class="clock-details"><div class="season" id="auckland-season"><span id="auckland-zone-name"></span><span class="zone-separator"> · </span><span id="auckland-offset"></span></div><div class="date calendar"><span id="auckland-date"></span><span class="weekday" id="auckland-weekday"></span></div></div>
         </div>
         <div class="clock-time-block">
           <div class="time" id="auckland-time"><span id="auckland-hours">--:--</span><span class="seconds" id="auckland-seconds">:--</span></div>
@@ -125,7 +126,7 @@
       <section class="clock" id="china-clock" aria-label="厦门时间">
         <div class="clock-meta">
           <h2 class="place"><span class="city-name" id="china-city">厦门</span><span id="china-english">XIAMEN</span></h2>
-          <div class="clock-details"><div class="season" id="china-season">中国标准时间 · UTC+8</div><div class="date calendar"><span id="china-date"></span><span class="weekday" id="china-weekday"></span></div></div>
+          <div class="clock-details"><div class="season" id="china-season"><span id="china-zone-name">中国标准时间</span><span class="zone-separator"> · </span><span id="china-offset">UTC+8</span></div><div class="date calendar"><span id="china-date"></span><span class="weekday" id="china-weekday"></span></div></div>
         </div>
         <div class="clock-time-block"><div class="time" id="china-time"><span id="china-hours">--:--</span><span class="seconds" id="china-seconds">:--</span></div></div>
       </section>
@@ -498,7 +499,8 @@
         document.getElementById(`${clock.id}-seconds`).textContent = time.slice(5);
         document.getElementById(`${clock.id}-date`).textContent = clock.date.format(local);
         document.getElementById(`${clock.id}-weekday`).textContent = clock.weekday.format(local);
-        document.getElementById(`${clock.id}-season`).textContent = `${CityClocks.currentName(clock.i, now)} · ${CityClocks.offsetText(offsetSeconds)}`;
+        document.getElementById(`${clock.id}-zone-name`).textContent = CityClocks.currentName(clock.i, now);
+        document.getElementById(`${clock.id}-offset`).textContent = CityClocks.offsetText(offsetSeconds);
       }
       resetWaterForDay(now.getTime());
       updateDisplayState(now);

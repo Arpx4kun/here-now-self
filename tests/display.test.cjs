@@ -363,7 +363,7 @@ const relocated = reload();
 assert.equal(vm.runInContext('displayState.mode', relocated), 'soft-reminder');
 assert.equal(get('auckland-hours').textContent, '00:30');
 assert.equal(get('china-hours').textContent, '10:15');
-assert.match(get('china-season').textContent, /UTC\+05:45/);
+assert.match(get('china-offset').textContent, /UTC\+05:45/);
 assert.equal(vm.runInContext('waterDay(displayNow())', relocated), '2026-10-12');
 assert.equal(vm.runInContext('nextRecovery(displayNow())', relocated), Date.parse('2026-10-13T11:30:00Z'));
 console.log('PASS: shared Z/button counters, recovery test preset plays Beginning once and clears records, repeated/custom/DST recovery tests, test restoration; four states, sleep suppression, configuration, audio and daily reset.');
