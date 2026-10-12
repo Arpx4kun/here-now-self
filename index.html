@@ -67,6 +67,7 @@
     .night-soft #auckland-clock { color: #ff5757; }
     .night-hint { display: none; position: absolute; top: 21vh; left: 2vw; width: 62.6vw; text-align: left; font-size: clamp(11px, 1vw, 20px); color: #ff8585; }
     .night-soft .night-hint, .night-strong .night-hint { display: block; }
+    .sleeping .night-hint { display: block; color: #b3d9b6; }
     .night-strong .clocks { display: block; height: 50%; }
     .night-strong #auckland-clock { height: 100%; grid-template-rows: 32% 68%; color: #ff3b3b; font-weight: 700; }
     .night-strong #china-clock, .night-strong .water { display: none; }
@@ -128,7 +129,7 @@
       <button type="button" data-test-time="07:30:00">07:30</button>
       <button type="button" id="test-water-reminder">测试喝水提醒</button>
     </div>
-    <p id="test-message" role="status">测试中 · 时间继续走动。Q 键可测试恢复；再次点击角落按钮，同步真实时间。</p>
+    <p id="test-message" role="status">测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。</p>
   </form>
   <script>
     'use strict';
@@ -137,16 +138,22 @@
     let nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
     let reminderFlashing = false;
     const STORAGE_KEY = 'water-display-v1';
-    const NIGHT_STORAGE_KEY = 'night-display-v1';
+    const NIGHT_STORAGE_KEY = 'night-display-v2';
+    const SLEEP_STORAGE_KEY = 'sleep-display-v1';
+    let sleepUntil = 0;
+    try {
+      const saved = Number(localStorage.getItem(SLEEP_STORAGE_KEY));
+      if (Number.isFinite(saved) && saved > 0) sleepUntil = saved;
+    } catch (_) {}
     let testMode = false;
     let testOffset = 0;
     let realStateSnapshot = null;
-    const testMessage = '测试中 · 时间继续走动。Q 键可测试恢复；再次点击角落按钮，同步真实时间。';
+    const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
     function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
-    let nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+    let nightState = { day: '', presses: 0, stage: 0 };
     try {
       const saved = JSON.parse(localStorage.getItem(NIGHT_STORAGE_KEY));
-      if (saved && typeof saved.day === 'string' && [0, 1, 2].includes(saved.dismissed) && [0, 1, 2].includes(saved.stage) && Number.isInteger(saved.presses) && saved.presses >= 0 && saved.presses < 10) nightState = saved;
+      if (saved && typeof saved.day === 'string' && [0, 1, 2].includes(saved.stage) && Number.isInteger(saved.presses) && saved.presses >= 0 && saved.presses < 10) nightState = saved;
     } catch (_) {}
     const nightFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
     const aucklandOffsetFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', timeZoneName: 'longOffset' });
@@ -156,19 +163,43 @@
       try { localStorage.setItem(NIGHT_STORAGE_KEY, JSON.stringify(nightState)); } catch (_) {}
     }
     function updateNight(now) {
+      updateSleep(now);
       const parts = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
       const day = `${parts.year}-${parts.month}-${parts.day}`;
       const minutes = Number(parts.hour) * 60 + Number(parts.minute);
       const stage = minutes >= 450 ? 0 : minutes >= 60 ? 2 : 1;
       if (nightState.day !== day || nightState.stage !== stage) {
-        nightState = { day, dismissed: nightState.day === day && stage !== 0 ? nightState.dismissed : 0, presses: 0, stage };
+        nightState = { day, presses: 0, stage };
         saveNight();
       }
-      activeNightStage = stage > nightState.dismissed ? stage : 0;
+      activeNightStage = sleepUntil ? 0 : stage;
       document.body.classList.toggle('night-soft', activeNightStage === 1);
       document.body.classList.toggle('night-strong', activeNightStage === 2);
-      const required = activeNightStage === 2 ? 10 : 2;
-      document.getElementById('night-hint').textContent = activeNightStage ? `夜深了，记得休息 · 按 Q 恢复正常（${nightState.presses} / ${required}）· 07:30 自动恢复` : '';
+      const required = activeNightStage === 2 ? 10 : 3;
+      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式 · 定时喝水闪烁已暂停 · 奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息 · 按 ${required} 下 Z 退出提醒并就寝（${nightState.presses} / ${required}）· 07:30 自动恢复` : '';
+    }
+    function saveSleep() {
+      if (testMode) return;
+      try { localStorage.setItem(SLEEP_STORAGE_KEY, String(sleepUntil)); } catch (_) {}
+    }
+    function updateSleep(now) {
+      if (sleepUntil && now.getTime() >= sleepUntil) {
+        sleepUntil = 0;
+        saveSleep();
+        nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+      }
+      document.body.classList.toggle('sleeping', Boolean(sleepUntil));
+    }
+    function enterSleep(now) {
+      const p = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
+      const nextDay = Number(p.hour) * 60 + Number(p.minute) >= 450;
+      const wakeDay = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + (nextDay ? 1 : 0))).toISOString().slice(0, 10);
+      sleepUntil = aucklandInputToDate(`${wakeDay}T07:30:00`).getTime();
+      nightState.presses = 0;
+      saveSleep();
+      saveNight();
+      clearWaterReminder();
+      updateNight(now);
     }
     // 喝水日从奥克兰当地 07:30 开始；此前仍属于前一天。
     function waterDay(now) {
@@ -220,13 +251,14 @@
       document.body.classList.remove('water-reminder-visible');
     }
     function triggerWaterReminder() {
-      if (reminderFlashing) return;
+      if (sleepUntil || reminderFlashing) return;
       document.getElementById('water-reminder').hidden = true;
       document.body.classList.remove('water-reminder-visible');
       reminderFlashing = true;
       document.getElementById('water-flash').classList.add('flashing');
     }
     function checkWaterReminder() {
+      if (sleepUntil) return;
       const now = Date.now();
       if (now >= nextWaterReminderAt) {
         // 电脑休眠或页面在后台时，回来只提醒一次，不补播积压的闪烁。
@@ -284,19 +316,19 @@
       if (event.target && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (event.repeat || event.altKey || event.metaKey || event.isComposing) return;
       if (event.ctrlKey && event.code !== 'ControlLeft') return;
-      if (event.code === 'KeyQ' || event.key.toLowerCase() === 'q') {
+      if (event.code === 'KeyZ' || event.key.toLowerCase() === 'z') {
         event.preventDefault();
         const now = displayNow();
         updateNight(now);
+        if (sleepUntil) return;
         if (activeNightStage) {
           nightState.presses += 1;
-          if (nightState.presses >= (activeNightStage === 2 ? 10 : 2)) {
-            nightState.dismissed = activeNightStage;
-            nightState.presses = 0;
+          if (nightState.presses >= (activeNightStage === 2 ? 10 : 3)) {
+            enterSleep(now);
           }
           saveNight();
           updateNight(now);
-        }
+        } else enterSleep(now);
         return;
       }
       if (event.code !== 'ControlLeft') return;
@@ -337,7 +369,8 @@
       }
       testOffset = date.getTime() - Date.now();
       // 每次应用时重新开始模拟，方便反复测试同一提醒。
-      nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+      nightState = { day: '', presses: 0, stage: 0 };
+      sleepUntil = 0;
       state = { ...realStateSnapshot.water };
       document.getElementById('test-message').textContent = testMessage;
       renderCounter();
@@ -347,16 +380,19 @@
       if (testMode) {
         state = { ...realStateSnapshot.water };
         nightState = { ...realStateSnapshot.night };
+        sleepUntil = realStateSnapshot.sleepUntil;
+        nextWaterReminderAt = realStateSnapshot.reminderAt;
         testMode = false;
         testOffset = 0;
         realStateSnapshot = null;
       } else {
-        realStateSnapshot = { water: { ...state }, night: { ...nightState } };
+        realStateSnapshot = { water: { ...state }, night: { ...nightState }, sleepUntil, reminderAt: nextWaterReminderAt };
         testMode = true;
         testOffset = 0;
         document.getElementById('test-time').value = aucklandInputValue(new Date());
         document.getElementById('test-message').textContent = testMessage;
-        nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+        nightState = { day: '', presses: 0, stage: 0 };
+        sleepUntil = 0;
       }
       document.getElementById('test-panel').hidden = !testMode;
       document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试时间';

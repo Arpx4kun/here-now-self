@@ -45,7 +45,7 @@ const context = vm.createContext({
 vm.runInContext(script, context);
 const run = code => vm.runInContext(code, context);
 const press = (code, repeat = false) => listeners.keydown({
-  code, key: code === 'KeyQ' ? 'q' : 'Control', ctrlKey: code.startsWith('Control'), repeat, preventDefault() {}
+  code, key: code.startsWith('Key') ? code.slice(3).toLowerCase() : 'Control', ctrlKey: code.startsWith('Control'), repeat, preventDefault() {}
 });
 const finishFlash = () => get('water-flash').handlers.animationend({ animationName: 'water-flash' });
 
@@ -99,4 +99,61 @@ assert.equal(get('count').textContent, 0);
 for (let i = 0; i < 40; i++) press('ControlLeft');
 assert.equal(get('count').textContent, 36);
 assert.equal(get('water-reminder').hidden, true);
-console.log('PASS: 20-minute boundaries, flash-to-text sequence, left Ctrl only, held-key filtering, confetti cleanup and cap, reminder cancellation, resume without backlog, manual test cadence, daily 07:30 reset and 36-count goal.');
+now = Date.parse('2026-10-13T05:00:00Z'); // 18:00，普通状态按一次 Z 就寝。
+run('tick(); triggerWaterReminder()');
+press('KeyZ');
+assert.equal(run('sleepUntil'), Date.parse('2026-10-13T18:30:00Z'));
+assert.equal(get('water-flash').classList.contains('flashing'), false);
+assert.equal(get('water-reminder').hidden, true);
+assert.equal(context.document.body.classList.contains('sleeping'), true);
+now += 7 * 60 * 60 * 1000;
+run('tick(); triggerWaterReminder()');
+assert.equal(get('water-flash').classList.contains('flashing'), false);
+assert.equal(run('activeNightStage'), 0);
+now = Date.parse('2026-10-13T18:29:59Z');
+run('tick()');
+assert(run('sleepUntil') > 0);
+now += 1000;
+run('tick()');
+assert.equal(run('sleepUntil'), 0);
+assert.equal(context.document.body.classList.contains('sleeping'), false);
+assert.equal(run('nextWaterReminderAt'), now + 20 * 60 * 1000);
+now += 20 * 60 * 1000;
+run('tick()');
+assert.equal(get('water-flash').classList.contains('flashing'), true);
+finishFlash();
+
+now = Date.parse('2026-10-14T11:00:00Z'); // 00:00，三次 Z。
+run('tick()');
+press('KeyQ');
+press('KeyZ', true);
+assert.equal(run('nightState.presses'), 0);
+press('KeyZ'); press('KeyZ');
+assert.equal(run('sleepUntil'), 0);
+assert.equal(run('activeNightStage'), 1);
+press('KeyZ');
+assert(run('sleepUntil') > 0);
+assert.equal(run('activeNightStage'), 0);
+
+now = Date.parse('2026-10-15T12:00:00Z'); // 次日 01:00，十次 Z。
+run('tick()');
+for (let i = 0; i < 9; i++) press('KeyZ');
+assert.equal(run('sleepUntil'), 0);
+assert.equal(run('activeNightStage'), 2);
+press('KeyZ');
+assert.equal(run('sleepUntil'), Date.parse('2026-10-15T18:30:00Z'));
+const sleepingStorage = storage['sleep-display-v1'];
+const reopened = vm.createContext({
+  Date: FakeDate, Intl, console, localStorage: context.localStorage,
+  document: context.document, window: context.window, setInterval() {}, setTimeout() {}
+});
+vm.runInContext(script, reopened);
+assert.equal(vm.runInContext('sleepUntil', reopened), Number(sleepingStorage));
+assert.equal(vm.runInContext('activeNightStage', reopened), 0);
+assert.equal(get('water-flash').classList.contains('flashing'), false);
+
+run("enterSleep(new Date('2026-09-26T10:00:00Z'))");
+assert.equal(run('sleepUntil'), Date.parse('2026-09-26T18:30:00Z')); // 夏令时开始后的 07:30。
+run("enterSleep(new Date('2026-04-04T10:00:00Z'))");
+assert.equal(run('sleepUntil'), Date.parse('2026-04-04T19:30:00Z')); // 夏令时结束后的 07:30。
+console.log('PASS: water reminders, confetti, Ctrl filtering, daily reset; daytime Z, midnight 3×Z, 01:00 10×Z, Q ignored, held-key filtering, sleep persistence, flash suppression, 07:30 wake and reminder restart, daylight-saving wake times.');
