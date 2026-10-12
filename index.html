@@ -41,6 +41,10 @@
     .corner-controls { position: fixed; bottom: 20px; right: 24px; display: flex; gap: 10px; z-index: 5; }
     .corner-controls button { border: 1px solid #ffffff3d; border-radius: 8px; background: #0a142059; color: #fff7e9; padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; opacity: .6; }
     .corner-controls button:hover, .corner-controls button:focus-visible { opacity: 1; }
+    .sound-gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgb(0 0 0 / 50%); }
+    .sound-gate[hidden] { display: none; }
+    .sound-gate button { padding: 18px 36px; border: 1px solid #fff7e980; border-radius: 12px; background: #172030; color: #fff7e9; font: inherit; font-size: clamp(20px, 2vw, 30px); cursor: pointer; box-shadow: 0 8px 35px #0005; }
+    .sound-gate button:hover, .sound-gate button:focus-visible { background: #26394e; outline: 2px solid #e8c28a; outline-offset: 4px; }
     :fullscreen #fullscreen { display: none; }
     .test-toggle[aria-pressed="true"] { opacity: 1; color: #e8c28a; }
     .test-panel { position: fixed; z-index: 5; bottom: 65px; right: 24px; width: min(340px, calc(100vw - 48px)); padding: 18px; border: 1px solid #ffffff40; border-radius: 12px; background: #0a1420f2; box-shadow: 0 8px 30px #0005; font-size: 13px; }
@@ -87,7 +91,7 @@
 <body>
   <img class="background" id="background" src="9f6902398ecdf648c8d97add9c8aa1a6442595768.png" alt="星空下的露营插画">
   <div class="shade"></div>
-  <main>
+  <main inert>
     <div class="clocks">
       <section class="clock" id="auckland-clock" aria-label="奥克兰时间">
         <div class="clock-meta">
@@ -119,12 +123,15 @@
   <div class="water-flash" id="water-flash" aria-hidden="true"></div>
   <div class="water-reminder" id="water-reminder" role="status" hidden>喝一口水 · 按左 Ctrl 记录</div>
   <div class="confetti" id="confetti" aria-hidden="true"></div>
-  <div class="corner-controls">
+  <div class="corner-controls" inert>
     <button id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">配置</button>
     <button id="sleep-toggle">进入就寝（Z）</button>
-    <button id="enable-sound" title="浏览器需要先点击一次，才能自动播放提醒音效">开启声音</button>
+    <button id="enable-sound" title="浏览器需要先点击一次，才能自动播放提醒音效" hidden>开启声音</button>
     <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
     <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
+  </div>
+  <div class="sound-gate" id="sound-gate" role="dialog" aria-modal="true" aria-label="开启提醒声音">
+    <button id="sound-start" autofocus>开启声音</button>
   </div>
   <form class="test-panel settings-panel" id="settings-panel" hidden>
     <h2>喝水配置</h2>
@@ -222,12 +229,18 @@
         }
       });
     }
-    document.getElementById('enable-sound').addEventListener('click', () => {
+    function enableSound() {
+      document.getElementById('sound-gate').hidden = true;
+      document.querySelector('main').inert = false;
+      document.querySelector('.corner-controls').inert = false;
+      document.getElementById('enable-sound').hidden = true;
       if (sleepUntil) return;
       document.getElementById('enable-sound').textContent = '开启声音';
       const requested = pendingSounds.size ? [...pendingSounds] : ['fresh'];
       requested.forEach(playSound);
-    });
+    }
+    document.getElementById('enable-sound').addEventListener('click', enableSound);
+    document.getElementById('sound-start').addEventListener('click', enableSound);
     let nightState = { day: '', presses: 0, stage: 0 };
     try {
       const saved = JSON.parse(localStorage.getItem(NIGHT_STORAGE_KEY));
@@ -428,6 +441,7 @@
       checkWaterReminder();
     }
     document.addEventListener('keydown', event => {
+      if (!document.getElementById('sound-gate').hidden) return;
       if (event.target && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (event.repeat || event.altKey || event.metaKey || event.isComposing) return;
       if (event.ctrlKey && event.code !== 'ControlLeft') return;

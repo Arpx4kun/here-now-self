@@ -63,6 +63,20 @@ const sound = name => audioInstances.find(audio => audio.src === `${name}.mp3`);
 const enableSound = get('enable-sound').handlers.click;
 
 (async () => {
+assert.match(html, /background: rgb\(0 0 0 \/ 50%\)/);
+assert.match(html, /id="sound-start" autofocus/);
+get('sound-gate').hidden = false;
+press('ControlLeft');
+press('KeyZ');
+assert.equal(get('count').textContent, 0);
+assert.equal(run('sleepUntil'), 0);
+run('sleepUntil = Date.now() + 60000');
+get('sound-start').handlers.click();
+assert.equal(get('sound-gate').hidden, true);
+assert.equal(get('main').inert, false);
+assert.equal(get('.corner-controls').inert, false);
+assert(audioInstances.every(audio => audio.paused));
+run('sleepUntil = 0');
 assert.match(html, /background: #87ceeb/);
 assert.match(html, /water-flash \.9s ease-in-out 3/);
 assert.match(html, /0%, 100% \{ opacity: 0; \} 50% \{ opacity: \.9; \}/);
