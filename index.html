@@ -56,6 +56,7 @@
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
     .settings-panel label { margin-top: 14px; }
     .settings-panel h2 { margin: 0; font-size: 17px; font-weight: 400; }
+    .settings-panel { max-height: calc(100dvh - 140px); overflow-y: auto; }
     .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #87ceeb; opacity: 0; pointer-events: none; }
     .water-flash.flashing { display: block; animation: water-flash .9s ease-in-out 3; }
     @keyframes water-flash { 0%, 100% { opacity: 0; } 50% { opacity: .9; } }
@@ -121,7 +122,7 @@
     </section>
   </main>
   <div class="water-flash" id="water-flash" aria-hidden="true"></div>
-  <div class="water-reminder" id="water-reminder" role="status" hidden>喝一口水 · 按左 Ctrl 记录</div>
+  <div class="water-reminder" id="water-reminder" role="status" hidden>喝两口水，活动活动肩膀，把右肩往上抬抬。 · 按左 Ctrl 记录</div>
   <div class="confetti" id="confetti" aria-hidden="true"></div>
   <div class="corner-controls" inert>
     <button id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">配置</button>
@@ -140,6 +141,12 @@
     <label for="daily-volume">每日饮水量（毫升）</label>
     <input type="number" id="daily-volume" min="50" max="20000" step="50" value="1800" required>
     <p>每次喝两口，共 50 毫升；目标饮水量须为 50 的倍数。</p>
+    <label for="night-soft-time">初级防熬夜提醒（奥克兰时间）</label>
+    <input type="time" id="night-soft-time" value="00:00" required>
+    <label for="night-strong-time">高级防熬夜提醒（奥克兰时间）</label>
+    <input type="time" id="night-strong-time" value="01:00" required>
+    <label for="reset-time">每日恢复与清零（奥克兰时间）</label>
+    <input type="time" id="reset-time" value="07:30" required>
     <div class="test-actions">
       <button type="submit">保存配置</button>
       <button type="button" id="reset-water">重置喝水记录</button>
@@ -151,9 +158,9 @@
     <label for="test-time">模拟奥克兰日期与时间</label>
     <input type="datetime-local" id="test-time" step="1" required>
     <div class="test-actions">
-      <button type="button" data-test-time="00:00:00">00:00</button>
-      <button type="button" data-test-time="01:00:00">01:00</button>
-      <button type="button" data-test-time="07:30:00">07:30</button>
+      <button type="button" id="test-soft-time" data-test-time="00:00:00">00:00</button>
+      <button type="button" id="test-strong-time" data-test-time="01:00:00">01:00</button>
+      <button type="button" id="test-reset-time" data-test-time="07:30:00">07:30</button>
       <button type="button" id="test-water-reminder">测试喝水提醒</button>
     </div>
     <p id="test-message" role="status">测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。</p>
@@ -161,13 +168,24 @@
   <script>
     'use strict';
     const SETTINGS_STORAGE_KEY = 'water-settings-v1';
-    let settings = { minutes: 20, volume: 1800 };
+    const DEFAULT_SETTINGS = { minutes: 20, volume: 1800, softTime: '00:00', strongTime: '01:00', resetTime: '07:30' };
+    let settings = { ...DEFAULT_SETTINGS };
+    function timeMinutes(value) {
+      if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return NaN;
+      const [hour, minute] = value.split(':').map(Number);
+      return hour * 60 + minute;
+    }
     function validSettings(value) {
-      return value && Number.isInteger(value.minutes) && value.minutes >= 1 && value.minutes <= 1440 && Number.isInteger(value.volume) && value.volume >= 50 && value.volume <= 20000 && value.volume % 50 === 0;
+      if (!value || !Number.isInteger(value.minutes) || value.minutes < 1 || value.minutes > 1440 || !Number.isInteger(value.volume) || value.volume < 50 || value.volume > 20000 || value.volume % 50 !== 0) return false;
+      const start = timeMinutes(value.softTime);
+      const advanced = (timeMinutes(value.strongTime) - start + 1440) % 1440;
+      const recovery = (timeMinutes(value.resetTime) - start + 1440) % 1440;
+      return advanced > 0 && recovery > advanced;
     }
     try {
       const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY));
-      if (validSettings(saved)) settings = { minutes: saved.minutes, volume: saved.volume };
+      const migrated = { ...DEFAULT_SETTINGS, ...saved };
+      if (validSettings(migrated)) settings = migrated;
     } catch (_) {}
     let GOAL = settings.volume / 50;
     let WATER_REMINDER_INTERVAL = settings.minutes * 60 * 1000;
@@ -255,9 +273,13 @@
     function updateNight(now) {
       updateSleep(now);
       const parts = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
-      const day = `${parts.year}-${parts.month}-${parts.day}`;
       const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-      const stage = minutes >= 450 ? 0 : minutes >= 60 ? 2 : 1;
+      const start = timeMinutes(settings.softTime);
+      const elapsed = (minutes - start + 1440) % 1440;
+      const advanced = (timeMinutes(settings.strongTime) - start + 1440) % 1440;
+      const recovery = (timeMinutes(settings.resetTime) - start + 1440) % 1440;
+      const stage = elapsed >= recovery ? 0 : elapsed >= advanced ? 2 : 1;
+      const day = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day - (minutes < start ? 1 : 0))).toISOString().slice(0, 10);
       if (nightState.day !== day || nightState.stage !== stage) {
         stopSounds();
         nightState = { day, presses: 0, stage };
@@ -268,7 +290,7 @@
       document.body.classList.toggle('night-soft', activeNightStage === 1);
       document.body.classList.toggle('night-strong', activeNightStage === 2);
       const required = activeNightStage === 2 ? 10 : 3;
-      document.getElementById('night-hint').textContent = sleepUntil ? '就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 07:30 自动退出' : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n07:30 自动恢复` : '';
+      document.getElementById('night-hint').textContent = sleepUntil ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 ${settings.resetTime} 自动退出` : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
       document.getElementById('sleep-toggle').textContent = sleepUntil ? '退出就寝（Z）' : activeNightStage ? `进入就寝（Z · ${nightState.presses}/${required}）` : '进入就寝（Z）';
     }
     function saveSleep() {
@@ -287,12 +309,21 @@
       }
       document.body.classList.toggle('sleeping', Boolean(sleepUntil));
     }
+    function nextRecovery(now) {
+      const p = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
+      const reset = timeMinutes(settings.resetTime);
+      const nextDay = Number(p.hour) * 60 + Number(p.minute) >= reset;
+      const localWake = Date.UTC(+p.year, +p.month - 1, +p.day + (nextDay ? 1 : 0), 0, reset);
+      // 若设定时刻被夏令时跳过，则在当天第一个有效时刻恢复。
+      for (let minute = 0; minute <= 180; minute++) {
+        const input = new Date(localWake + minute * 60000).toISOString().slice(0, 19);
+        const date = aucklandInputToDate(input);
+        if (date) return date.getTime();
+      }
+    }
     function enterSleep(now) {
       normalUntil = 0;
-      const p = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
-      const nextDay = Number(p.hour) * 60 + Number(p.minute) >= 450;
-      const wakeDay = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + (nextDay ? 1 : 0))).toISOString().slice(0, 10);
-      sleepUntil = aucklandInputToDate(`${wakeDay}T07:30:00`).getTime();
+      sleepUntil = nextRecovery(now);
       nightState.presses = 0;
       saveSleep();
       saveNight();
@@ -301,7 +332,7 @@
       updateNight(now);
     }
     function exitSleep(now) {
-      // 手动退出时保持正常显示，直到下一次 07:30，避免立刻回到夜间闪烁。
+      // 手动退出时保持正常显示，直到下一次配置的恢复时间。
       normalUntil = sleepUntil;
       sleepUntil = 0;
       nightState.presses = 0;
@@ -323,10 +354,10 @@
         updateNight(now);
       } else enterSleep(now);
     }
-    // 喝水日从奥克兰当地 07:30 开始；此前仍属于前一天。
+    // 喝水日从奥克兰当地配置的清零时间开始；此前仍属于前一天。
     function waterDay(now) {
       const p = Object.fromEntries(nightFormat.formatToParts(new Date(now)).map(part => [part.type, part.value]));
-      const beforeReset = Number(p.hour) * 60 + Number(p.minute) < 450;
+      const beforeReset = Number(p.hour) * 60 + Number(p.minute) < timeMinutes(settings.resetTime);
       const date = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) - (beforeReset ? 1 : 0)));
       return date.toISOString().slice(0, 10);
     }
@@ -499,6 +530,7 @@
     }
     document.getElementById('test-toggle').addEventListener('click', () => {
       stopSounds();
+      clearWaterReminder();
       if (testMode) {
         state = { ...realStateSnapshot.water };
         nightState = { ...realStateSnapshot.night };
@@ -523,9 +555,10 @@
       }
       document.getElementById('test-panel').hidden = !testMode;
       closeSettings();
-      document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试选项';
+      document.getElementById('test-toggle').textContent = testMode ? '恢复实际状态' : '测试选项';
       document.getElementById('test-toggle').setAttribute('aria-pressed', String(testMode));
       renderCounter();
+      renderTestTimes();
       tick();
     });
     document.getElementById('test-panel').addEventListener('submit', event => {
@@ -558,24 +591,38 @@
       document.getElementById('test-panel').hidden = true;
       document.getElementById('reminder-minutes').value = settings.minutes;
       document.getElementById('daily-volume').value = settings.volume;
+      document.getElementById('night-soft-time').value = settings.softTime;
+      document.getElementById('night-strong-time').value = settings.strongTime;
+      document.getElementById('reset-time').value = settings.resetTime;
       document.getElementById('settings-message').textContent = '';
       panel.hidden = false;
       document.getElementById('settings-toggle').setAttribute('aria-expanded', 'true');
     });
     document.getElementById('settings-panel').addEventListener('submit', event => {
       event.preventDefault();
-      const requested = { minutes: Number(document.getElementById('reminder-minutes').value), volume: Number(document.getElementById('daily-volume').value) };
+      const requested = { minutes: Number(document.getElementById('reminder-minutes').value), volume: Number(document.getElementById('daily-volume').value), softTime: document.getElementById('night-soft-time').value, strongTime: document.getElementById('night-strong-time').value, resetTime: document.getElementById('reset-time').value };
       if (!validSettings(requested)) {
-        document.getElementById('settings-message').textContent = '间隔须为 1–1440 的整数，饮水量须为 50–20000 内的 50 倍数。';
+        document.getElementById('settings-message').textContent = '间隔须为 1–1440 的整数，饮水量须为 50–20000 内的 50 倍数；初级、高级、恢复时间须按先后顺序设置，可跨午夜。';
         return;
       }
       const intervalChanged = settings.minutes !== requested.minutes;
+      const resetChanged = settings.resetTime !== requested.resetTime;
       settings = requested;
       GOAL = settings.volume / 50;
       WATER_REMINDER_INTERVAL = settings.minutes * 60 * 1000;
       if (intervalChanged) nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+      if (resetChanged) {
+        const now = displayNow();
+        state.day = waterDay(now);
+        save();
+        if (sleepUntil) sleepUntil = nextRecovery(now);
+        if (normalUntil) normalUntil = nextRecovery(now);
+        saveSleep();
+      }
       if (!testMode) { try { localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings)); } catch (_) {} }
       renderCounter();
+      renderTestTimes();
+      updateNight(displayNow());
       document.getElementById('settings-message').textContent = `已保存 · 每 ${settings.minutes} 分钟提醒，目标 ${GOAL} 次${testMode ? '（仅本次测试）' : ''}`;
     });
     document.getElementById('reset-water').addEventListener('click', () => {
@@ -588,6 +635,14 @@
     });
     document.addEventListener('visibilitychange', tick);
     window.addEventListener('pageshow', tick);
+    function renderTestTimes() {
+      for (const [id, time] of [['test-soft-time', settings.softTime], ['test-strong-time', settings.strongTime], ['test-reset-time', settings.resetTime]]) {
+        const button = document.getElementById(id);
+        button.textContent = time;
+        button.dataset.testTime = `${time}:00`;
+      }
+    }
+    renderTestTimes();
     renderCounter();
     tick();
     setInterval(tick, 250);
