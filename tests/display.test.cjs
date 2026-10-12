@@ -98,12 +98,12 @@ press('ControlRight');
 press('ControlLeft', true);
 assert.equal(get('count').textContent, 0);
 assert.equal(get('confetti').children.length, 0);
-assert.equal(sound('instant').plays, 0);
+assert.equal(sound('hearty').plays, 0);
 press('ControlLeft');
 assert.equal(get('count').textContent, 1);
 assert.equal(get('water-reminder').hidden, true);
 assert.equal(get('confetti').children.length, 80);
-assert.equal(sound('instant').plays, 1);
+assert.equal(sound('hearty').plays, 1);
 assert.equal(JSON.parse(storage['water-display-v1']).count, 1);
 
 now += 20 * 60 * 1000;
@@ -140,7 +140,8 @@ assert.equal(get('water-reminder').hidden, true);
 now = Date.parse('2026-10-13T05:00:00Z'); // 18:00，普通状态按一次 Z 就寝。
 run('tick(); triggerWaterReminder()');
 press('KeyZ');
-assert(audioInstances.every(audio => audio.paused));
+assert(audioInstances.every(audio => audio.src === 'music.mp3' || audio.paused));
+assert.equal(sound('music').plays, 1);
 const silentPlays = audioInstances.map(audio => audio.plays);
 assert.equal(run('sleepUntil'), Date.parse('2026-10-13T18:30:00Z'));
 assert.equal(get('water-flash').classList.contains('flashing'), false);
@@ -160,6 +161,10 @@ now += 1000;
 run('tick()');
 assert.equal(run('sleepUntil'), 0);
 assert.equal(context.document.body.classList.contains('sleeping'), false);
+assert.equal(sound('begining').plays, 1);
+assert.equal(sound('begining').paused, false);
+run('tick()');
+assert.equal(sound('begining').plays, 1);
 assert.equal(run('nextWaterReminderAt'), now + 20 * 60 * 1000);
 now += 20 * 60 * 1000;
 run('tick()');
@@ -173,6 +178,7 @@ press('KeyZ', true);
 assert(run('sleepUntil') > now);
 press('KeyZ');
 assert.equal(run('sleepUntil'), 0);
+assert.equal(run('normalUntil'), 0); // 白天退出不屏蔽下一次午夜提醒。
 assert.equal(run('nextWaterReminderAt'), now + 20 * 60 * 1000);
 get('sleep-toggle').handlers.click();
 assert(run('sleepUntil') > now);
@@ -237,7 +243,6 @@ assert.equal(run('GOAL'), 36);
 assert.equal(get('count').textContent, 0);
 
 now = Date.parse('2026-10-14T11:00:00Z'); // 00:00，三次 Z。
-run('normalUntil = 0; saveSleep()');
 run('tick()');
 assert.equal(sound('aesthetic').paused, false);
 const midnightPlays = sound('aesthetic').plays;
@@ -304,7 +309,7 @@ sound('fragrance').blocked = true;
 run("playSound('fragrance'); enterSleep(displayNow())");
 await new Promise(resolve => setImmediate(resolve));
 assert.equal(run('pendingSounds.size'), 0);
-assert(audioInstances.every(audio => audio.paused));
+assert(audioInstances.every(audio => audio.src === 'music.mp3' || audio.paused));
 // 自定义夜间时间可跨午夜；恢复、清零、测试预设都使用同一配置。
 run('sleepUntil = 0; normalUntil = 0; stopSounds()');
 now = Date.parse('2026-10-18T09:29:59Z');
@@ -341,6 +346,44 @@ configure(20, 1800, { softTime: '00:00', strongTime: '01:00', resetTime: '02:30'
 run("enterSleep(new Date('2026-09-26T10:00:00Z'))");
 assert.equal(run('sleepUntil'), Date.parse('2026-09-26T14:00:00Z'));
 assert.equal(JSON.parse(storage['water-settings-v1']).resetTime, '02:30');
+// 连续真实时间跨午夜和一点：白天退出就寝不能漏掉提醒，初级解除不屏蔽高级。
+now = Date.parse('2026-10-20T10:59:59Z');
+run('sleepUntil = 0; normalUntil = 0; stopSounds()');
+configure(20, 1800);
+run('tick()');
+assert.equal(run('activeNightStage'), 0);
+const softBefore = sound('aesthetic').plays;
+now += 1000;
+run('tick()');
+assert.equal(run('activeNightStage'), 1);
+assert.equal(sound('aesthetic').plays, softBefore + 1);
+press('KeyZ'); press('KeyZ'); press('KeyZ');
+const musicBefore = sound('music').plays;
+assert.equal(sound('music').paused, false);
+press('KeyZ');
+assert.equal(run('sleepUntil'), 0);
+assert.equal(run('normalUntil'), Date.parse('2026-10-20T12:00:00Z'));
+assert.equal(sound('begining').paused, false);
+assert.equal(sound('music').paused, true);
+now = Date.parse('2026-10-20T11:59:59Z');
+run('tick()');
+assert.equal(run('activeNightStage'), 0);
+const strongBefore = sound('fragrance').plays;
+now += 1000;
+run('tick()');
+assert.equal(run('activeNightStage'), 2);
+assert.equal(sound('fragrance').plays, strongBefore + 1);
+run('tick(); tick()');
+assert.equal(sound('fragrance').plays, strongBefore + 1);
+assert.equal(sound('music').plays, musicBefore);
+storage['normal-display-v1'] = String(now + 8 * 60 * 60 * 1000);
+const legacyReload = vm.createContext({
+  Date: FakeDate, Intl, console, Audio: FakeAudio, localStorage: context.localStorage,
+  document: context.document, window: context.window, setInterval() {}, setTimeout() {}
+});
+vm.runInContext(script, legacyReload);
+assert.equal(vm.runInContext('normalUntil', legacyReload), 0);
+assert.equal(vm.runInContext('activeNightStage', legacyReload), 2);
 assert.match(html, /喝两口水，活动活动肩膀，把右肩往上抬抬/);
-console.log('PASS: configurable night stages/recovery/reset, midnight continuity, DST skipped recovery time, test reminder cleanup; settings persistence/isolation, water targets/intervals, Z/button sleep toggle, audio suppression, confetti and Ctrl filtering.');
+console.log('PASS: real midnight/01:00 transitions, obsolete suppression migration, Hearty/Music/Beginning audio, single automatic wake sound; configured times, DST, test cleanup, settings persistence, water goals, sleep toggles and key filtering.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

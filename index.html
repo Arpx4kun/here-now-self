@@ -194,7 +194,7 @@
     const STORAGE_KEY = 'water-display-v1';
     const NIGHT_STORAGE_KEY = 'night-display-v2';
     const SLEEP_STORAGE_KEY = 'sleep-display-v1';
-    const NORMAL_STORAGE_KEY = 'normal-display-v1';
+    const NORMAL_STORAGE_KEY = 'normal-display-v2';
     let normalUntil = 0;
     try {
       const saved = Number(localStorage.getItem(NORMAL_STORAGE_KEY));
@@ -210,7 +210,7 @@
     let realStateSnapshot = null;
     const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
     function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
-    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'instant'].map(name => {
+    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'hearty', 'music', 'begining'].map(name => {
       const audio = new Audio(`${name}.mp3`);
       audio.preload = 'auto';
       return [name, audio];
@@ -226,17 +226,18 @@
       }
     }
     function playSound(name) {
-      if (sleepUntil) return;
+      const allowed = () => !sleepUntil || name === 'music';
+      if (!allowed()) return;
       const audio = sounds[name];
       const generation = soundGeneration;
       audio.currentTime = 0;
       audio.play().then(() => {
         if (generation !== soundGeneration) return;
-        if (sleepUntil) { audio.pause(); return; }
+        if (!allowed()) { audio.pause(); return; }
         pendingSounds.delete(name);
         document.getElementById('enable-sound').hidden = pendingSounds.size === 0;
       }).catch(error => {
-        if (generation !== soundGeneration || sleepUntil) return;
+        if (generation !== soundGeneration || !allowed()) return;
         if (error.name === 'NotAllowedError') {
           pendingSounds.add(name);
           document.getElementById('enable-sound').hidden = false;
@@ -271,7 +272,7 @@
       try { localStorage.setItem(NIGHT_STORAGE_KEY, JSON.stringify(nightState)); } catch (_) {}
     }
     function updateNight(now) {
-      updateSleep(now);
+      const woke = updateSleep(now);
       const parts = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
       const minutes = Number(parts.hour) * 60 + Number(parts.minute);
       const start = timeMinutes(settings.softTime);
@@ -292,6 +293,7 @@
       const required = activeNightStage === 2 ? 10 : 3;
       document.getElementById('night-hint').textContent = sleepUntil ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 ${settings.resetTime} 自动退出` : activeNightStage ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${nightState.presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
       document.getElementById('sleep-toggle').textContent = sleepUntil ? '退出就寝（Z）' : activeNightStage ? `进入就寝（Z · ${nightState.presses}/${required}）` : '进入就寝（Z）';
+      if (woke) playSound('begining');
     }
     function saveSleep() {
       if (testMode) return;
@@ -301,17 +303,23 @@
       } catch (_) {}
     }
     function updateSleep(now) {
+      let woke = false;
       if (normalUntil && now.getTime() >= normalUntil) { normalUntil = 0; saveSleep(); }
       if (sleepUntil && now.getTime() >= sleepUntil) {
         sleepUntil = 0;
         saveSleep();
         nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+        woke = true;
       }
       document.body.classList.toggle('sleeping', Boolean(sleepUntil));
+      return woke;
     }
     function nextRecovery(now) {
+      return nextLocalTime(now, settings.resetTime);
+    }
+    function nextLocalTime(now, time) {
       const p = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
-      const reset = timeMinutes(settings.resetTime);
+      const reset = timeMinutes(time);
       const nextDay = Number(p.hour) * 60 + Number(p.minute) >= reset;
       const localWake = Date.UTC(+p.year, +p.month - 1, +p.day + (nextDay ? 1 : 0), 0, reset);
       // 若设定时刻被夏令时跳过，则在当天第一个有效时刻恢复。
@@ -330,10 +338,11 @@
       stopSounds();
       clearWaterReminder();
       updateNight(now);
+      playSound('music');
     }
     function exitSleep(now) {
-      // 手动退出时保持正常显示，直到下一次配置的恢复时间。
-      normalUntil = sleepUntil;
+      // 只解除当前夜间阶段；白天退出不能屏蔽随后到来的午夜提醒。
+      normalUntil = nightState.stage === 1 ? nextLocalTime(now, settings.strongTime) : nightState.stage === 2 ? nextRecovery(now) : 0;
       sleepUntil = 0;
       nightState.presses = 0;
       saveSleep();
@@ -342,6 +351,7 @@
       clearWaterReminder();
       nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
       updateNight(now);
+      playSound('begining');
     }
     function toggleSleep() {
       const now = displayNow();
@@ -490,7 +500,7 @@
       renderCounter();
       clearWaterReminder();
       celebrateWater();
-      playSound('instant');
+      playSound('hearty');
     });
     function aucklandInputValue(date) {
       const p = Object.fromEntries(nightFormat.formatToParts(date).map(part => [part.type, part.value]));
