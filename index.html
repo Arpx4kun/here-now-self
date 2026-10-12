@@ -49,6 +49,21 @@
     .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
+    .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #fff; pointer-events: none; }
+    .water-flash.flashing { display: block; animation: water-flash .9s linear 3; }
+    @keyframes water-flash { 0%, 42% { opacity: 1; } 43%, 100% { opacity: 0; } }
+    .water-reminder { position: fixed; z-index: 4; bottom: 0; left: 0; width: 100%; padding: 9px 16px; text-align: center; background: #0a1420d9; color: #fff7e9; font-size: clamp(16px, 1.5vw, 28px); line-height: 1.2; pointer-events: none; }
+    .water-reminder[hidden] { display: none; }
+    .water-reminder-visible .corner-controls { bottom: 64px; }
+    .water-reminder-visible .test-panel { bottom: 109px; }
+    .water-reminder-visible .water { bottom: calc(3vh + 44px); }
+    .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+    .confetti-piece { position: absolute; left: var(--x); top: var(--y); width: 9px; height: 15px; background: var(--color); border-radius: 2px; animation: confetti-burst var(--duration) ease-out forwards; }
+    @keyframes confetti-burst {
+      0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+      45% { opacity: 1; transform: translate(var(--mid-x), var(--rise)) rotate(var(--spin)); }
+      100% { opacity: 0; transform: translate(var(--end-x), 200px) rotate(var(--end-spin)); }
+    }
     .night-soft #auckland-clock { color: #ff5757; }
     .night-hint { display: none; position: absolute; top: 21vh; left: 2vw; width: 62.6vw; text-align: left; font-size: clamp(11px, 1vw, 20px); color: #ff8585; }
     .night-soft .night-hint, .night-strong .night-hint { display: block; }
@@ -96,6 +111,9 @@
       <div class="water-bottom"><span>按 <kbd>左 Ctrl</kbd> 记录一次喝水</span><span id="status" role="status">今天的第一口，从现在开始</span></div>
     </section>
   </main>
+  <div class="water-flash" id="water-flash" aria-hidden="true"></div>
+  <div class="water-reminder" id="water-reminder" role="status" hidden>喝一口水 · 按左 Ctrl 记录</div>
+  <div class="confetti" id="confetti" aria-hidden="true"></div>
   <div class="corner-controls">
     <button class="test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
     <button id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
@@ -108,12 +126,16 @@
       <button type="button" data-test-time="00:00:00">00:00</button>
       <button type="button" data-test-time="01:00:00">01:00</button>
       <button type="button" data-test-time="07:30:00">07:30</button>
+      <button type="button" id="test-water-reminder">测试喝水提醒</button>
     </div>
     <p id="test-message" role="status">测试中 · 时间继续走动。Q 键可测试恢复；再次点击角落按钮，同步真实时间。</p>
   </form>
   <script>
     'use strict';
     const GOAL = 36;
+    const WATER_REMINDER_INTERVAL = 20 * 60 * 1000;
+    let nextWaterReminderAt = Date.now() + WATER_REMINDER_INTERVAL;
+    let reminderFlashing = false;
     const STORAGE_KEY = 'water-display-v1';
     const NIGHT_STORAGE_KEY = 'night-display-v1';
     let testMode = false;
@@ -191,6 +213,59 @@
         renderCounter();
       }
     }
+    function clearWaterReminder() {
+      reminderFlashing = false;
+      document.getElementById('water-flash').classList.remove('flashing');
+      document.getElementById('water-reminder').hidden = true;
+      document.body.classList.remove('water-reminder-visible');
+    }
+    function triggerWaterReminder() {
+      if (reminderFlashing) return;
+      document.getElementById('water-reminder').hidden = true;
+      document.body.classList.remove('water-reminder-visible');
+      reminderFlashing = true;
+      document.getElementById('water-flash').classList.add('flashing');
+    }
+    function checkWaterReminder() {
+      const now = Date.now();
+      if (now >= nextWaterReminderAt) {
+        // 电脑休眠或页面在后台时，回来只提醒一次，不补播积压的闪烁。
+        nextWaterReminderAt += (Math.floor((now - nextWaterReminderAt) / WATER_REMINDER_INTERVAL) + 1) * WATER_REMINDER_INTERVAL;
+        triggerWaterReminder();
+      }
+    }
+    document.getElementById('water-flash').addEventListener('animationend', event => {
+      if (event.animationName !== 'water-flash' || !reminderFlashing) return;
+      reminderFlashing = false;
+      document.getElementById('water-flash').classList.remove('flashing');
+      document.getElementById('water-reminder').hidden = false;
+      document.body.classList.add('water-reminder-visible');
+    });
+    function celebrateWater() {
+      const layer = document.getElementById('confetti');
+      const colors = ['#ff7777', '#ffd17a', '#96e0c1', '#90bbff', '#d5a0ff', '#fff4da'];
+      // 限制同时存在的彩纸数，快速连续按键也不会持续堆积元素。
+      while (layer.children.length > 160) layer.firstElementChild.remove();
+      for (let i = 0; i < 80; i++) {
+        const piece = document.createElement('span');
+        const dx = (Math.random() - .5) * window.innerWidth * .7;
+        const rise = -(140 + Math.random() * window.innerHeight * .45);
+        const spin = (Math.random() - .5) * 1080;
+        const duration = 1800 + Math.random() * 1000;
+        piece.className = 'confetti-piece';
+        piece.style.setProperty('--x', `${(i % 2 ? .78 : .22) * window.innerWidth}px`);
+        piece.style.setProperty('--y', `${window.innerHeight * .82}px`);
+        piece.style.setProperty('--color', colors[i % colors.length]);
+        piece.style.setProperty('--mid-x', `${dx * .6}px`);
+        piece.style.setProperty('--end-x', `${dx}px`);
+        piece.style.setProperty('--rise', `${rise}px`);
+        piece.style.setProperty('--spin', `${spin}deg`);
+        piece.style.setProperty('--end-spin', `${spin * 2}deg`);
+        piece.style.setProperty('--duration', `${duration}ms`);
+        layer.appendChild(piece);
+        setTimeout(() => piece.remove(), duration + 100);
+      }
+    }
     function tick() {
       const now = displayNow();
       for (const clock of clockFormats) {
@@ -203,6 +278,7 @@
       document.getElementById('auckland-season').textContent = offset === 'GMT+13:00' ? '夏令时 · UTC+13' : '标准时间（非夏令时）· UTC+12';
       resetWaterForDay(now.getTime());
       updateNight(now);
+      checkWaterReminder();
     }
     document.addEventListener('keydown', event => {
       if (event.target && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
@@ -231,6 +307,8 @@
       state.lastPressed = now;
       save();
       renderCounter();
+      clearWaterReminder();
+      celebrateWater();
     });
     function aucklandInputValue(date) {
       const p = Object.fromEntries(nightFormat.formatToParts(date).map(part => [part.type, part.value]));
@@ -302,6 +380,7 @@
       try { await document.documentElement.requestFullscreen(); }
       catch (_) { document.getElementById('fullscreen').textContent = '请按 F11 全屏'; }
     });
+    document.getElementById('test-water-reminder').addEventListener('click', triggerWaterReminder);
     document.addEventListener('visibilitychange', tick);
     window.addEventListener('pageshow', tick);
     renderCounter();
