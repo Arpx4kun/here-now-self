@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>此刻 · 时间与喝水</title>
+  <style>
+    @font-face { font-family: "Xiaolai"; src: url("assets/Xiaolai-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+    :root { color-scheme: dark; font-family: "Xiaolai", "Microsoft YaHei", sans-serif; color: #fff7e9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; height: 100dvh; overflow: hidden; background: #172030; }
+    .background { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+    .shade { position: fixed; inset: 0; background: linear-gradient(180deg, rgba(6,13,24,.5), rgba(6,13,24,.15) 48%, transparent 70%); }
+    main { position: relative; padding: clamp(28px, 6vh, 70px) clamp(24px, 7vw, 150px) 0; }
+    .clocks { display: grid; grid-template-columns: 2fr 1fr; gap: 3vw; }
+    .clock { min-width: 0; }
+    .clock { text-align: center; text-shadow: 0 2px 25px rgba(0,0,0,.55); }
+    .place { margin: 0 0 12px; font-size: clamp(16px, 1.8vw, 25px); font-weight: 400; letter-spacing: .18em; }
+    .place span { display: block; margin-top: 5px; font-size: 10px; letter-spacing: .28em; opacity: .6; }
+    .time { font-size: clamp(38px, 9vw, 160px); line-height: 1.08; font-weight: 300; letter-spacing: -.035em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #china-clock .time { font-size: clamp(25px, 4.8vw, 86px); }
+    .season { margin-top: 8px; font-size: clamp(11px, 1vw, 16px); letter-spacing: .05em; opacity: .7; }
+    .date { margin-top: 14px; font-size: clamp(13px, 1.5vw, 22px); letter-spacing: .06em; opacity: .88; }
+    .water { margin: clamp(24px, 4vh, 45px) auto 0; width: min(640px, 100%); padding: 20px 26px; background: rgba(10,20,32,.48); border: 1px solid rgba(255,244,219,.18); border-radius: 20px; backdrop-filter: blur(12px); box-shadow: 0 8px 35px rgba(0,0,0,.1); }
+    .water-top { display: flex; align-items: center; gap: 22px; }
+    .counter { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #count { font-size: 48px; line-height: 1; font-weight: 300; }
+    .total { font-size: 18px; opacity: .55; }
+    .caption { font-size: 14px; line-height: 1.8; color: rgba(255,247,233,.78); }
+    .caption strong { display: block; font-weight: 500; font-size: 17px; color: #fff7e9; }
+    .progress { height: 4px; background: rgba(255,255,255,.13); border-radius: 4px; margin-top: 18px; overflow: hidden; }
+    .fill { width: 0; height: 100%; background: #e8c28a; transition: width .25s; }
+    .water-bottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: 11px; color: rgba(255,247,233,.6); }
+    kbd { padding: 2px 6px; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; font: inherit; color: #fff7e9; }
+    .complete .fill { background: #b3d9b6; }
+    .complete #status { color: #c4e8c6; }
+    .fullscreen { position: fixed; bottom: 20px; right: 24px; border: 1px solid rgba(255,255,255,.24); border-radius: 8px; background: rgba(10,20,32,.35); color: #fff7e9; padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; opacity: .5; }
+    .fullscreen:hover, .fullscreen:focus-visible { opacity: 1; }
+    :fullscreen .fullscreen { display: none; }
+    @media (max-width: 600px) { main { padding: 35px 16px 0; } .clocks { gap: 14px; } .time { font-size: 11vw; } #china-clock .time { font-size: 5.3vw; } .date { font-size: 12px; } #china-clock .date { font-size: 10px; } .water { padding: 18px; } .water-top { gap: 16px; } .caption { font-size: 12px; } .water-bottom { flex-wrap: wrap; } }
+    @media (max-height: 550px) { main { padding-top: 20px; } .place { margin-bottom: 5px; } .time { font-size: min(7vw, 70px); } .date { margin-top: 5px; } .water { margin-top: 18px; padding: 14px 22px; } }
+    .night-soft #auckland-clock { color: #ff5757; }
+    .night-hint { display: none; text-align: center; margin-top: 18px; font-size: 15px; color: #ff8585; }
+    .night-soft .night-hint, .night-strong .night-hint { display: block; }
+    .night-strong main { height: 100%; padding: 24px; display: flex; flex-direction: column; justify-content: center; }
+    .night-strong .clocks { display: block; }
+    .night-strong #china-clock, .night-strong .water { display: none; }
+    .night-strong .shade { background: rgba(6,13,24,.72); }
+    .night-strong #auckland-clock { color: #ff3b3b; font-weight: 700; }
+    .night-strong #auckland-clock .place { font-size: clamp(24px, 4vw, 65px); font-weight: 700; }
+    .night-strong #auckland-clock .time { font-size: clamp(48px, 19vw, 350px); font-weight: 700; animation: night-pulse 1.2s ease-in-out infinite; text-shadow: 0 0 30px rgba(255,59,59,.35); }
+    .night-strong #auckland-clock .date { font-size: clamp(18px, 3vw, 45px); }
+    @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+    .test-toggle { left: 20px; right: auto; z-index: 5; }
+    .test-toggle[aria-pressed="true"] { opacity: 1; color: #e8c28a; }
+    .test-panel { position: fixed; z-index: 5; bottom: 65px; left: 20px; width: min(340px, calc(100vw - 40px)); padding: 18px; border: 1px solid rgba(255,255,255,.25); border-radius: 12px; background: rgba(10,20,32,.95); box-shadow: 0 8px 30px #0005; font-size: 13px; }
+    .test-panel[hidden] { display: none; }
+    .test-panel label { display: block; margin-bottom: 10px; }
+    .test-panel input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ffffff40; background: #ffffff0a; color: #fff7e9; font: inherit; }
+    .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
+    .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
+    :fullscreen .test-toggle { display: block; }
+  </style>
+</head>
+<body>
+  <img class="background" id="background" src="9f6902398ecdf648c8d97add9c8aa1a6442595768.png" alt="星空下的露营插画">
+  <div class="shade"></div>
+  <main>
+    <div class="clocks">
+      <section class="clock" id="auckland-clock" aria-label="奥克兰时间">
+        <h1 class="place">奥克兰<span>AUCKLAND</span></h1>
+        <div class="time" id="auckland-time">--:--:--</div>
+        <div class="date" id="auckland-date"></div>
+        <div class="season" id="auckland-season"></div>
+      </section>
+      <section class="clock" id="china-clock" aria-label="厦门时间">
+        <h2 class="place">厦门<span>XIAMEN</span></h2>
+        <div class="time" id="china-time">--:--:--</div>
+        <div class="date" id="china-date"></div>
+      </section>
+    </div>
+    <div class="night-hint" id="night-hint" role="status"></div>
+    <section class="water" id="water" aria-label="每日喝水计数器">
+      <div class="water-top">
+        <div class="counter"><span id="count">0</span><span class="total"> / 36 次</span></div>
+        <div class="caption"><strong>记得喝水</strong>每天喝 1800 毫升的水<br>总共 36 次，每次喝两口</div>
+      </div>
+      <div class="progress" role="progressbar" aria-label="喝水目标进度" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div class="fill" id="fill"></div></div>
+      <div class="water-bottom"><span>按 <kbd>左 Ctrl</kbd> 记录一次喝水</span><span id="status" role="status">今天的第一口，从现在开始</span></div>
+    </section>
+  </main>
+  <button class="fullscreen" id="fullscreen" title="也可以按 F11 进入浏览器全屏">进入全屏 ↗</button>
+  <button class="fullscreen test-toggle" id="test-toggle" aria-pressed="false" aria-controls="test-panel">测试时间</button>
+  <form class="test-panel" id="test-panel" hidden>
+    <label for="test-time">模拟奥克兰日期与时间</label>
+    <input type="datetime-local" id="test-time" step="1" required>
+    <div class="test-actions">
+      <button type="submit">应用时间</button>
+      <button type="button" data-test-time="00:00:00">00:00</button>
+      <button type="button" data-test-time="01:00:00">01:00</button>
+      <button type="button" data-test-time="07:30:00">07:30</button>
+    </div>
+    <p id="test-message" role="status">测试中 · 时间继续走动。Q 键可测试恢复；再次点击角落按钮，同步真实时间。</p>
+  </form>
+  <script>
+    'use strict';
+    const GOAL = 36;
+    const RESET_AFTER = 6 * 60 * 60 * 1000;
+    const STORAGE_KEY = 'water-display-v1';
+    const NIGHT_STORAGE_KEY = 'night-display-v1';
+    let testMode = false;
+    let testOffset = 0;
+    let realStateSnapshot = null;
+    const testMessage = '测试中 · 时间继续走动。Q 键可测试恢复；再次点击角落按钮，同步真实时间。';
+    function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
+    let nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+    try {
+      const saved = JSON.parse(localStorage.getItem(NIGHT_STORAGE_KEY));
+      if (saved && typeof saved.day === 'string' && [0, 1, 2].includes(saved.dismissed) && [0, 1, 2].includes(saved.stage) && Number.isInteger(saved.presses) && saved.presses >= 0 && saved.presses < 10) nightState = saved;
+    } catch (_) {}
+    const nightFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+    const aucklandOffsetFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', timeZoneName: 'longOffset' });
+    let activeNightStage = 0;
+    function saveNight() {
+      if (testMode) return;
+      try { localStorage.setItem(NIGHT_STORAGE_KEY, JSON.stringify(nightState)); } catch (_) {}
+    }
+    function updateNight(now) {
+      const parts = Object.fromEntries(nightFormat.formatToParts(now).map(part => [part.type, part.value]));
+      const day = `${parts.year}-${parts.month}-${parts.day}`;
+      const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+      const stage = minutes >= 450 ? 0 : minutes >= 60 ? 2 : 1;
+      if (nightState.day !== day || nightState.stage !== stage) {
+        nightState = { day, dismissed: nightState.day === day && stage !== 0 ? nightState.dismissed : 0, presses: 0, stage };
+        saveNight();
+      }
+      activeNightStage = stage > nightState.dismissed ? stage : 0;
+      document.body.classList.toggle('night-soft', activeNightStage === 1);
+      document.body.classList.toggle('night-strong', activeNightStage === 2);
+      const required = activeNightStage === 2 ? 10 : 2;
+      document.getElementById('night-hint').textContent = activeNightStage ? `夜深了，记得休息 · 按 Q 恢复正常（${nightState.presses} / ${required}）· 07:30 自动恢复` : '';
+    }
+    let state = { count: 0, lastPressed: null };
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved && Number.isInteger(saved.count) && saved.count >= 0 && saved.count <= GOAL && Number.isFinite(saved.lastPressed) && saved.lastPressed > 0) state = saved;
+    } catch (_) { /* 浏览器限制本地存储时，仍可在当前页面计数。 */ }
+    const clockFormats = [
+      { id: 'auckland', zone: 'Pacific/Auckland' },
+      { id: 'china', zone: 'Asia/Shanghai' }
+    ].map(({ id, zone }) => ({
+      id,
+      time: new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+      date: new Intl.DateTimeFormat('zh-CN', { timeZone: zone, year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+    }));
+    function save() {
+      if (testMode) return;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
+    }
+    function renderCounter() {
+      document.getElementById('count').textContent = state.count;
+      document.getElementById('fill').style.width = `${state.count / GOAL * 100}%`;
+      document.querySelector('.progress').setAttribute('aria-valuenow', state.count);
+      document.getElementById('water').classList.toggle('complete', state.count === GOAL);
+      document.getElementById('status').textContent = state.count === GOAL ? '✓ 今日喝水目标已达成' : state.count === 0 ? '今天的第一口，从现在开始' : `还差 ${GOAL - state.count} 次 · 加油`;
+    }
+    function resetIfExpired(now) {
+      if (state.lastPressed !== null && now - state.lastPressed > RESET_AFTER) {
+        state = { count: 0, lastPressed: null };
+        save();
+        renderCounter();
+      }
+    }
+    function tick() {
+      const now = displayNow();
+      for (const clock of clockFormats) {
+        document.getElementById(`${clock.id}-time`).textContent = clock.time.format(now);
+        document.getElementById(`${clock.id}-date`).textContent = clock.date.format(now);
+      }
+      const offset = aucklandOffsetFormat.formatToParts(now).find(part => part.type === 'timeZoneName').value;
+      document.getElementById('auckland-season').textContent = offset === 'GMT+13:00' ? '夏令时 · UTC+13' : '标准时间（非夏令时）· UTC+12';
+      resetIfExpired(now.getTime());
+      updateNight(now);
+    }
+    document.addEventListener('keydown', event => {
+      if (event.target && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.repeat || event.altKey || event.metaKey || event.isComposing) return;
+      if (event.ctrlKey && event.code !== 'ControlLeft') return;
+      if (event.code === 'KeyQ' || event.key.toLowerCase() === 'q') {
+        event.preventDefault();
+        const now = displayNow();
+        updateNight(now);
+        if (activeNightStage) {
+          nightState.presses += 1;
+          if (nightState.presses >= (activeNightStage === 2 ? 10 : 2)) {
+            nightState.dismissed = activeNightStage;
+            nightState.presses = 0;
+          }
+          saveNight();
+          updateNight(now);
+        }
+        return;
+      }
+      if (event.code !== 'ControlLeft') return;
+      event.preventDefault();
+      const now = displayNow().getTime();
+      resetIfExpired(now);
+      state.count = Math.min(GOAL, state.count + 1);
+      state.lastPressed = now;
+      save();
+      renderCounter();
+    });
+    function aucklandInputValue(date) {
+      const p = Object.fromEntries(nightFormat.formatToParts(date).map(part => [part.type, part.value]));
+      return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
+    }
+    function aucklandInputToDate(value) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+      if (!match) return null;
+      const [, year, month, day, hour, minute, second = '00'] = match;
+      const desired = Date.UTC(+year, +month - 1, +day, +hour, +minute, +second);
+      let instant = desired;
+      // 通过奥克兰时区反算，不依赖电脑时区，也不写死夏令时偏移。
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const p = Object.fromEntries(nightFormat.formatToParts(new Date(instant)).map(part => [part.type, part.value]));
+        const represented = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+        instant += desired - represented;
+      }
+      const date = new Date(instant);
+      return aucklandInputValue(date) === `${year}-${month}-${day}T${hour}:${minute}:${second}` ? date : null;
+    }
+    function applyTestTime() {
+      const date = aucklandInputToDate(document.getElementById('test-time').value);
+      if (!date) {
+        document.getElementById('test-message').textContent = '请输入有效的奥克兰时间（夏令时跳过的时刻无法设置）。';
+        return;
+      }
+      testOffset = date.getTime() - Date.now();
+      // 每次应用时重新开始模拟，方便反复测试同一提醒。
+      nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+      state = { ...realStateSnapshot.water };
+      document.getElementById('test-message').textContent = testMessage;
+      renderCounter();
+      tick();
+    }
+    document.getElementById('test-toggle').addEventListener('click', () => {
+      if (testMode) {
+        state = { ...realStateSnapshot.water };
+        nightState = { ...realStateSnapshot.night };
+        testMode = false;
+        testOffset = 0;
+        realStateSnapshot = null;
+      } else {
+        realStateSnapshot = { water: { ...state }, night: { ...nightState } };
+        testMode = true;
+        testOffset = 0;
+        document.getElementById('test-time').value = aucklandInputValue(new Date());
+        document.getElementById('test-message').textContent = testMessage;
+        nightState = { day: '', dismissed: 0, presses: 0, stage: 0 };
+      }
+      document.getElementById('test-panel').hidden = !testMode;
+      document.getElementById('test-toggle').textContent = testMode ? '恢复真实时间' : '测试时间';
+      document.getElementById('test-toggle').setAttribute('aria-pressed', String(testMode));
+      renderCounter();
+      tick();
+    });
+    document.getElementById('test-panel').addEventListener('submit', event => {
+      event.preventDefault();
+      applyTestTime();
+      document.getElementById('test-time').blur();
+    });
+    document.querySelectorAll('[data-test-time]').forEach(button => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById('test-time');
+        input.value = `${input.value.slice(0, 10)}T${button.dataset.testTime}`;
+        applyTestTime();
+      });
+    });
+    document.getElementById('fullscreen').addEventListener('click', async () => {
+      try { await document.documentElement.requestFullscreen(); }
+      catch (_) { document.getElementById('fullscreen').textContent = '请按 F11 全屏'; }
+    });
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('pageshow', tick);
+    renderCounter();
+    tick();
+    setInterval(tick, 250);
+    // 多张图片时每 60 秒轮换；把同文件夹内的图片文件名加入此列表即可。
+    const images = ['9f6902398ecdf648c8d97add9c8aa1a6442595768.png'];
+    if (images.length > 1) {
+      let imageIndex = 0;
+      setInterval(() => {
+        imageIndex = (imageIndex + 1) % images.length;
+        document.getElementById('background').src = images[imageIndex];
+      }, 60000);
+    }
+  </script>
+</body>
+</html>
