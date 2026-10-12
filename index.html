@@ -207,7 +207,7 @@
     const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
     function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
     function isSleeping() { return displayState.mode === MODES.SLEEP; }
-    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'hearty', 'music', 'begining'].map(name => {
+    const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'cheerful', 'music', 'begining'].map(name => {
       const audio = new Audio(`${name}.mp3`);
       audio.preload = 'auto';
       return [name, audio];
@@ -473,7 +473,7 @@
       renderCounter();
       clearWaterReminder();
       celebrateWater();
-      playSound('hearty');
+      playSound('cheerful');
     });
     function aucklandInputValue(date) {
       const p = Object.fromEntries(nightFormat.formatToParts(date).map(part => [part.type, part.value]));
