@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const script = fs.readFileSync(path.join(__dirname, '..', 'city-clocks.js'), 'utf8') + '\n' + html.match(/<script>([\s\S]*?)<\/script>/)[1];
 let now = Date.parse('2026-10-12T05:00:00Z');
 const storage = {};
 const listeners = {};
@@ -315,5 +315,20 @@ await new Promise(resolve => setImmediate(resolve));
 assert.equal(run('pendingSounds.size'), 0);
 assert(audioInstances.every(audio => audio.src === 'music.mp3' || audio.paused));
 assert.equal(mode(), 'sleep');
+// 重新载入已选城市：左侧纽约用于提醒/清零，右侧尼泊尔处理 45 分钟偏移。
+storage['clock-cities-v1'] = JSON.stringify([
+  {country:'US',english:'New York',chinese:'纽约',zone:'America/New_York'},
+  {country:'NP',english:'Kathmandu',chinese:'加德满都',zone:'Asia/Kathmandu'}
+]);
+delete storage['display-state-v1'];
+delete storage['sleep-display-v1'];
+now = Date.parse('2026-10-13T04:30:00Z'); // 纽约 00:30，尼泊尔 10:15。
+const relocated = reload();
+assert.equal(vm.runInContext('displayState.mode', relocated), 'soft-reminder');
+assert.equal(get('auckland-hours').textContent, '00:30');
+assert.equal(get('china-hours').textContent, '10:15');
+assert.match(get('china-season').textContent, /UTC\+05:45/);
+assert.equal(vm.runInContext('waterDay(displayNow())', relocated), '2026-10-12');
+assert.equal(vm.runInContext('nextRecovery(displayNow())', relocated), Date.parse('2026-10-13T11:30:00Z'));
 console.log('PASS: shared Z/button counters, recovery test preset plays Beginning once and clears records, repeated/custom/DST recovery tests, test restoration; four states, sleep suppression, configuration, audio and daily reset.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

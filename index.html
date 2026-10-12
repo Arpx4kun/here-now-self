@@ -54,9 +54,21 @@
     .test-panel button { border: 1px solid #ffffff40; border-radius: 6px; padding: 6px 10px; background: #ffffff0a; color: #fff7e9; font: inherit; cursor: pointer; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
     .test-panel p { font-size: 11px; line-height: 1.7; opacity: .75; margin: 12px 0 0; }
+    .test-panel a { color: #a5d6f5; }
     .settings-panel label { margin-top: 14px; }
     .settings-panel h2 { margin: 0; font-size: 17px; font-weight: 400; }
     .settings-panel { max-height: calc(100dvh - 140px); overflow-y: auto; }
+    .city-editor { margin: 14px 0; padding: 12px 0; border-bottom: 1px solid #ffffff29; }
+    .city-editor h3 { margin: 0; font-size: 14px; font-weight: 400; }
+    .city-inputs { display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
+    .city-inputs label { margin-top: 10px; font-size: 12px; }
+    .city-country { text-transform: uppercase; }
+    .city-results { display: grid; gap: 6px; margin-top: 10px; max-height: 180px; overflow-y: auto; line-height: 1.5; }
+    .city-results button { text-align: left; }
+    .city-results button:hover { background: #ffffff20; }
+    .place { overflow-wrap: anywhere; }
+    .place .city-name { margin-left: 0; font-size: 1em; letter-spacing: inherit; opacity: 1; }
+    .night-strong #auckland-clock .place { white-space: normal; }
     .water-flash { display: none; position: fixed; inset: 0; z-index: 20; background: #87ceeb; opacity: 0; pointer-events: none; }
     .water-flash.flashing { display: block; animation: water-flash .9s ease-in-out 3; }
     @keyframes water-flash { 0%, 100% { opacity: 0; } 50% { opacity: .9; } }
@@ -96,7 +108,7 @@
     <div class="clocks">
       <section class="clock" id="auckland-clock" aria-label="奥克兰时间">
         <div class="clock-meta">
-          <h1 class="place">奥克兰<span>AUCKLAND</span></h1>
+          <h1 class="place"><span class="city-name" id="auckland-city">奥克兰</span><span id="auckland-english">AUCKLAND</span></h1>
           <div class="clock-details"><div class="date" id="auckland-date"></div><div class="season" id="auckland-season"></div></div>
         </div>
         <div class="clock-time-block">
@@ -106,7 +118,7 @@
       </section>
       <section class="clock" id="china-clock" aria-label="厦门时间">
         <div class="clock-meta">
-          <h2 class="place">厦门<span>XIAMEN</span></h2>
+          <h2 class="place"><span class="city-name" id="china-city">厦门</span><span id="china-english">XIAMEN</span></h2>
           <div class="clock-details"><div class="date" id="china-date"></div><div class="season" id="china-season">中国标准时间 · UTC+8</div></div>
         </div>
         <div class="clock-time-block"><div class="time" id="china-time"><span id="china-hours">--:--</span><span class="seconds" id="china-seconds">:--</span></div></div>
@@ -135,17 +147,40 @@
     <button id="sound-start" autofocus>开启声音</button>
   </div>
   <form class="test-panel settings-panel" id="settings-panel" hidden>
-    <h2>喝水配置</h2>
+    <h2>配置</h2>
+    <div class="city-editor">
+      <h3>左侧大时钟城市</h3>
+      <div class="city-inputs">
+        <div><label for="city-country-0">国家代码</label><input class="city-country" id="city-country-0" maxlength="2" placeholder="NZ" autocomplete="off"></div>
+        <div><label for="city-query-0">城市搜索</label><input id="city-query-0" maxlength="200" placeholder="Auckland" autocomplete="off"></div>
+      </div>
+      <div class="test-actions"><button type="button" id="city-search-0">搜索城市</button></div>
+      <div class="city-results" id="city-results-0" aria-live="polite"></div>
+      <p id="city-status-0" role="status"></p>
+    </div>
+    <div class="city-editor">
+      <h3>右侧小时钟城市</h3>
+      <div class="city-inputs">
+        <div><label for="city-country-1">国家代码</label><input class="city-country" id="city-country-1" maxlength="2" placeholder="CN" autocomplete="off"></div>
+        <div><label for="city-query-1">城市搜索</label><input id="city-query-1" maxlength="200" placeholder="Xiamen" autocomplete="off"></div>
+      </div>
+      <div class="test-actions"><button type="button" id="city-search-1">搜索城市</button></div>
+      <div class="city-results" id="city-results-1" aria-live="polite"></div>
+      <p id="city-status-1" role="status"></p>
+    </div>
+    <button type="button" id="city-sync">重新同步网络时间</button>
+    <p>选择结果后立即保存城市。就寝提醒和每日清零跟随左侧城市时间；测试模式中不能更改城市。</p>
+    <p>地点数据：<a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> / <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>；网络时间：<a href="https://timeapi.io/" target="_blank" rel="noopener">TimeAPI.io</a>。无中文译名时保留原名。</p>
     <label for="reminder-minutes">提醒间隔（分钟）</label>
     <input type="number" id="reminder-minutes" min="1" max="1440" step="1" value="20" required>
     <label for="daily-volume">每日饮水量（毫升）</label>
     <input type="number" id="daily-volume" min="50" max="20000" step="50" value="1800" required>
     <p>每次喝两口，共 50 毫升；目标饮水量须为 50 的倍数。</p>
-    <label for="night-soft-time">初级防熬夜提醒（奥克兰时间）</label>
+    <label for="night-soft-time" id="soft-time-label">初级防熬夜提醒（奥克兰时间）</label>
     <input type="time" id="night-soft-time" value="00:00" required>
-    <label for="night-strong-time">高级防熬夜提醒（奥克兰时间）</label>
+    <label for="night-strong-time" id="strong-time-label">高级防熬夜提醒（奥克兰时间）</label>
     <input type="time" id="night-strong-time" value="01:00" required>
-    <label for="reset-time">每日恢复与清零（奥克兰时间）</label>
+    <label for="reset-time" id="reset-time-label">每日恢复与清零（奥克兰时间）</label>
     <input type="time" id="reset-time" value="07:30" required>
     <div class="test-actions">
       <button type="submit">保存配置</button>
@@ -155,7 +190,7 @@
     <p id="settings-message" role="status"></p>
   </form>
   <form class="test-panel" id="test-panel" hidden>
-    <label for="test-time">模拟奥克兰日期与时间</label>
+    <label for="test-time" id="test-time-label">模拟奥克兰日期与时间</label>
     <input type="datetime-local" id="test-time" step="1" required>
     <div class="test-actions">
       <button type="button" id="test-soft-time" data-test-time="00:00:00">00:00</button>
@@ -165,6 +200,7 @@
     </div>
     <p id="test-message" role="status">测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。</p>
   </form>
+  <script src="city-clocks.js"></script>
   <script>
     'use strict';
     const SETTINGS_STORAGE_KEY = 'water-settings-v1';
@@ -205,7 +241,7 @@
     let testOffset = 0;
     let realStateSnapshot = null;
     const testMessage = '测试中 · 时间继续走动。Z 键可测试就寝；再次点击角落按钮，同步真实时间。';
-    function displayNow() { return new Date(Date.now() + (testMode ? testOffset : 0)); }
+    function displayNow() { return new Date(CityClocks.utcNow() + (testMode ? testOffset : 0)); }
     function isSleeping() { return displayState.mode === MODES.SLEEP; }
     const sounds = Object.fromEntries(['fresh', 'aesthetic', 'fragrance', 'cheerful', 'music', 'begining'].map(name => {
       const audio = new Audio(`${name}.mp3`);
@@ -256,8 +292,16 @@
     }
     document.getElementById('enable-sound').addEventListener('click', enableSound);
     document.getElementById('sound-start').addEventListener('click', enableSound);
-    const nightFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-    const aucklandOffsetFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', timeZoneName: 'longOffset' });
+    let nightFormat;
+    let clockFormats;
+    function buildClockFormats() {
+      nightFormat = new Intl.DateTimeFormat('en-GB', { timeZone: CityClocks.get(0).zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+      clockFormats = ['auckland', 'china'].map((id, i) => ({ id, i,
+        time: new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+        date: new Intl.DateTimeFormat('zh-CN', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+      }));
+    }
+    buildClockFormats();
     function saveDisplayState() {
       if (testMode) return;
       try { localStorage.setItem(DISPLAY_STORAGE_KEY, JSON.stringify(displayState)); } catch (_) {}
@@ -279,7 +323,7 @@
       document.body.classList.toggle('night-strong', mode === MODES.STRONG);
       const reminding = mode === MODES.SOFT || mode === MODES.STRONG;
       const required = mode === MODES.STRONG ? 10 : 3;
-      document.getElementById('night-hint').textContent = isSleeping() ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n奥克兰 ${settings.resetTime} 自动退出` : reminding ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
+      document.getElementById('night-hint').textContent = isSleeping() ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n${CityClocks.get(0).chinese} ${settings.resetTime} 自动退出` : reminding ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
       document.getElementById('sleep-toggle').textContent = isSleeping() ? '退出就寝（Z）' : reminding ? `进入就寝（Z · ${presses}/${required}）` : '进入就寝（Z）';
     }
     function transitionMode(mode, { wakeAt = 0, reason = 'clock' } = {}) {
@@ -353,14 +397,6 @@
         state = { count: saved.count, lastPressed, day };
       }
     } catch (_) { /* 浏览器限制本地存储时，仍可在当前页面计数。 */ }
-    const clockFormats = [
-      { id: 'auckland', zone: 'Pacific/Auckland' },
-      { id: 'china', zone: 'Asia/Shanghai' }
-    ].map(({ id, zone }) => ({
-      id,
-      time: new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
-      date: new Intl.DateTimeFormat('zh-CN', { timeZone: zone, year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-    }));
     function save() {
       if (testMode) return;
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
@@ -442,13 +478,14 @@
     function tick() {
       const now = displayNow();
       for (const clock of clockFormats) {
-        const time = clock.time.format(now);
+        const offsetSeconds = CityClocks.actualOffset(clock.i, now, testMode);
+        const local = new Date(now.getTime() + offsetSeconds * 1000);
+        const time = clock.time.format(local);
         document.getElementById(`${clock.id}-hours`).textContent = time.slice(0, 5);
         document.getElementById(`${clock.id}-seconds`).textContent = time.slice(5);
-        document.getElementById(`${clock.id}-date`).textContent = clock.date.format(now);
+        document.getElementById(`${clock.id}-date`).textContent = clock.date.format(local);
+        document.getElementById(`${clock.id}-season`).textContent = `${CityClocks.currentName(clock.i, now)} · ${CityClocks.offsetText(offsetSeconds)}`;
       }
-      const offset = aucklandOffsetFormat.formatToParts(now).find(part => part.type === 'timeZoneName').value;
-      document.getElementById('auckland-season').textContent = offset === 'GMT+13:00' ? '夏令时 · UTC+13' : '标准时间（非夏令时）· UTC+12';
       resetWaterForDay(now.getTime());
       updateDisplayState(now);
       checkWaterReminder();
@@ -502,10 +539,10 @@
         if (dayStart) date = new Date(nextRecovery(dayStart));
       }
       if (!date) {
-        document.getElementById('test-message').textContent = '请输入有效的奥克兰时间（夏令时跳过的时刻无法设置）。';
+        document.getElementById('test-message').textContent = `请输入有效的${CityClocks.get(0).chinese}时间（夏令时跳过的时刻无法设置）。`;
         return;
       }
-      testOffset = date.getTime() - Date.now();
+      testOffset = date.getTime() - CityClocks.utcNow();
       stopSounds();
       // 每次应用时重新开始模拟，方便反复测试同一提醒。
       displayState = recovery ? { mode: MODES.SLEEP, wakeAt: date.getTime(), presses: 0 } : { mode: MODES.NORMAL, wakeAt: 0, presses: 0 };
@@ -534,7 +571,7 @@
         realStateSnapshot = { water: { ...state }, display: { ...displayState }, settings: { ...settings }, reminderAt: nextWaterReminderAt };
         testMode = true;
         testOffset = 0;
-        document.getElementById('test-time').value = aucklandInputValue(new Date());
+        document.getElementById('test-time').value = aucklandInputValue(displayNow());
         document.getElementById('test-message').textContent = testMessage;
         displayState = { mode: MODES.NORMAL, wakeAt: 0, presses: 0 };
       }
@@ -580,6 +617,7 @@
       document.getElementById('night-strong-time').value = settings.strongTime;
       document.getElementById('reset-time').value = settings.resetTime;
       document.getElementById('settings-message').textContent = '';
+      CityClocks.openSettings();
       panel.hidden = false;
       document.getElementById('settings-toggle').setAttribute('aria-expanded', 'true');
     });
@@ -626,6 +664,17 @@
         button.dataset.testTime = `${time}:00`;
       }
     }
+    CityClocks.init({ isTesting: () => testMode, onChange: leftChanged => {
+      buildClockFormats();
+      if (leftChanged) {
+        // 切换地点保留已喝次数，只重新划定喝水日和就寝恢复时刻。
+        state.day = waterDay(displayNow()); save();
+        displayState.presses = 0;
+        if (isSleeping()) displayState.wakeAt = nextRecovery(displayNow());
+        saveDisplayState();
+      }
+      tick();
+    } });
     renderTestTimes();
     renderCounter();
     tick();
