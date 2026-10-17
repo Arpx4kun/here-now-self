@@ -182,7 +182,6 @@ const CityClocks = (() => {
     }
     el('city-sync').addEventListener('click', () => { sync(0); sync(1); });
     sync(0); sync(1);
-    setInterval(() => { sync(0); sync(1); }, 30 * 60000);
     let lastResume = mono();
     const resume = () => {
       if (document.hidden || mono() - lastResume < 60000) return;
@@ -192,5 +191,5 @@ const CityClocks = (() => {
     window.addEventListener('pageshow', resume);
     window.addEventListener('online', () => { sync(0); sync(1); });
   }
-  return { get: i => cities[i], utcNow, actualOffset, currentName, offsetText, parseNetwork, rank, init, openSettings };
+  return { get: i => cities[i], utcNow, actualOffset, currentName, offsetText, parseNetwork, rank, init, openSettings, syncAll: () => Promise.all([sync(0), sync(1)]) };
 })();
