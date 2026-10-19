@@ -103,6 +103,9 @@
     .night-strong #auckland-clock .calendar { flex-direction: column; align-items: flex-end; gap: 4px; font-size: 1em; }
     .night-strong #auckland-clock .season { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: .85em; }
     .night-strong #auckland-clock .zone-separator { display: none; }
+    .sleep-forecast { display: none; position: absolute; top: 100%; left: 34vw; right: 0; margin-top: 12px; color: #ff8585; font-size: clamp(24px, 2.2vw, 44px); line-height: 1.4; white-space: pre-line; text-align: left; }
+    .night-strong .sleep-forecast { display: block; }
+    .night-strong .night-hint { width: 30vw; }
     @keyframes night-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
     @media (max-width: 900px) { .water-top { align-items: flex-start; flex-direction: column; gap: 8px; } .clock-details { gap: 6px; } .clock-meta { gap: 6px; } .place span { margin-left: 6px; } }
     @media (orientation: portrait) { .clocks { height: 45%; } .water { width: 42vw; } .time { font-size: 17vw; } #china-clock .time { font-size: 8vw; } .clock-meta { padding-top: 0; } }
@@ -121,6 +124,7 @@
         <div class="clock-time-block">
           <div class="time" id="auckland-time"><span id="auckland-hours">--:--</span><span class="seconds" id="auckland-seconds">:--</span></div>
           <div class="night-hint" id="night-hint" role="status"></div>
+          <div class="sleep-forecast" id="sleep-forecast"></div>
         </div>
       </section>
       <section class="clock" id="china-clock" aria-label="厦门时间">
@@ -345,6 +349,19 @@
       const required = mode === MODES.STRONG ? 10 : 3;
       document.getElementById('night-hint').textContent = isSleeping() ? `就寝模式 · 按 Z 退出\n喝水提醒与音效已暂停\n${CityClocks.get(0).chinese} ${settings.resetTime} 自动退出` : reminding ? `夜深了，记得休息\n按 ${required} 下 Z 就寝（${presses} / ${required}）\n${settings.resetTime} 自动恢复` : '';
       document.getElementById('sleep-toggle').textContent = isSleeping() ? '退出就寝（Z）' : reminding ? `进入就寝（Z · ${presses}/${required}）` : '进入就寝（Z）';
+      renderSleepForecast(displayNow());
+    }
+    function renderSleepForecast(now) {
+      const hint = document.getElementById('sleep-forecast');
+      if (displayState.mode !== MODES.STRONG) { hint.textContent = ''; return; }
+      // 加的是实际经过的 8 小时，再换算到主城市，兼容跨日和夏令时跳变。
+      const wake = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+      const local = date => new Date(date.getTime() + CityClocks.actualOffset(0, date, testMode) * 1000);
+      const today = local(now), wakeLocal = local(wake);
+      const day = today.toISOString().slice(0, 10) === wakeLocal.toISOString().slice(0, 10) ? '今天' : '明天';
+      const time = clockFormats[0].time.format(wakeLocal).slice(0, 5);
+      const text = `现在入睡，睡满 8 小时将到${day} ${time}。\n别让补觉占掉上午，甚至下午。现在就睡吧。`;
+      if (hint.textContent !== text) hint.textContent = text;
     }
     function transitionMode(mode, { wakeAt = 0, reason = 'clock' } = {}) {
       if (mode === displayState.mode) { renderDisplayState(); return; }
