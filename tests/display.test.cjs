@@ -263,15 +263,15 @@ at('2026-10-13T11:59:59Z');
 assert.equal(mode(), 'soft-reminder');
 at('2026-10-13T12:00:00Z');
 assert.equal(mode(), 'strong-reminder');
-assert.match(get('sleep-forecast').textContent, /今天 09:00/);
+assert.equal(get('sleep-forecast').textContent, '现在入睡，洗漱完睡满 8 小时后\n将到 09:30 才可恢复。\n别让补觉占掉上午，甚至下午。\n现在就睡吧。');
 run("renderSleepForecast(new Date('2026-10-13T12:01:00Z'))");
-assert.match(get('sleep-forecast').textContent, /今天 09:01/);
+assert.match(get('sleep-forecast').textContent, /将到 09:31 才可恢复/);
 run("renderSleepForecast(new Date('2026-10-13T10:30:00Z'))");
-assert.match(get('sleep-forecast').textContent, /明天 07:30/);
+assert.match(get('sleep-forecast').textContent, /将到 08:00 才可恢复/);
 run("renderSleepForecast(new Date('2026-09-26T13:30:00Z'))");
-assert.match(get('sleep-forecast').textContent, /今天 10:30/); // 夏令时开始，实际八小时。
+assert.match(get('sleep-forecast').textContent, /将到 11:00 才可恢复/); // 夏令时开始，实际八小时半。
 run("renderSleepForecast(new Date('2026-04-04T12:30:00Z'))");
-assert.match(get('sleep-forecast').textContent, /今天 08:30/); // 夏令时结束。
+assert.match(get('sleep-forecast').textContent, /将到 09:00 才可恢复/); // 夏令时结束。
 assert.equal(sound('fragrance').plays, strongBefore + 1);
 run('tick(); tick()');
 assert.equal(sound('fragrance').plays, strongBefore + 1);
@@ -285,7 +285,7 @@ press('KeyZ');
 assert.equal(mode(), 'sleep');
 press('KeyZ');
 assert.equal(mode(), 'strong-reminder');
-assert.match(get('sleep-forecast').textContent, /今天 09:00/);
+assert.match(get('sleep-forecast').textContent, /将到 09:30 才可恢复/);
 clickSleepTimes(9);
 assert.equal(mode(), 'strong-reminder');
 assert.equal(run('displayState.presses'), 9);
